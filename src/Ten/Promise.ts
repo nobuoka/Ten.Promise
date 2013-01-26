@@ -28,11 +28,11 @@ module Ten {
                 that.__sucVal = val;
                 that.__notifySuccess();
             }
-            if (valOrPromise instanceof AbstractPromise) {
+            if (valOrPromise && typeof valOrPromise.then === "function") {
                 var p = <AbstractPromise>valOrPromise;
                 this.__stat = STAT_WAITING;
                 this.__promiseVal = p;
-                p.done(function (val) {
+                p.then(function (val) {
                     setValImpl(val);
                 }, function onError(err) {
                     that._setError(err);
