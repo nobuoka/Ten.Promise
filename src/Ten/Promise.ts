@@ -3,7 +3,10 @@ module Ten {
         promise?: AbstractPromise;
         s: (val) => any;
     }
+    var STAT_EMPTY = 0;
+    var STAT_FULFILLED = 1;
     export class AbstractPromise {
+        private __stat = STAT_EMPTY;
         private __sucVal;
         private __listeners: PromiseListener[];
         constructor () {
@@ -20,6 +23,7 @@ module Ten {
         _setValue(valOrPromise) {
             var that = this;
             function setValImpl (val) {
+                that.__stat = STAT_FULFILLED;
                 that.__sucVal = val;
                 that.__notifySuccess();
             }
@@ -48,7 +52,7 @@ module Ten {
             listener.promise._setValue(callbackRes);
         }
         private __registerListener(listener: PromiseListener) {
-            if (this.__sucVal) {
+            if (this.__stat === STAT_FULFILLED) {
                 this.__notifyListenerOfSuccess(listener, this.__sucVal);
             } else {
                 this.__listeners.push(listener);
