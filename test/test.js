@@ -28,7 +28,11 @@ asyncTest("Ten.Promise を非同期呼び出しで使う", function () {
 
     p.then(function (val) {
         equal(val, 100);
-        return 120;
+        return new Ten.Promise(function (s) {
+            setTimeout(function () {
+                s(120);
+            }, 200);
+        });
     }).then(function (val) {
         equal(val, 120);
         return "文字列を返す";

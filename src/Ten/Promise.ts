@@ -17,9 +17,22 @@ module Ten {
                 this.__notifyListenerOfSuccess(listener, val);
             }
         }
-        _setValue(val) {
-            this.__sucVal = val;
-            this.__notifySuccess();
+        _setValue(valOrPromise) {
+            var that = this;
+            function setValImpl (val) {
+                that.__sucVal = val;
+                that.__notifySuccess();
+            }
+            if (valOrPromise instanceof AbstractPromise) {
+                var p = <AbstractPromise>valOrPromise;
+                // 本来は done メソッドを使いたい
+                p.then(function (val) {
+                    setValImpl(val);
+                });
+            } else {
+                var val = <any>valOrPromise;
+                setValImpl(val);
+            }
         }
         cancel() {
         }
@@ -41,7 +54,7 @@ module Ten {
                 this.__listeners.push(listener);
             }
         }
-        then(onSuccess: (val) => Promise): AbstractPromise {
+        then(onSuccess: (val) => any): AbstractPromise {
             var p = new SimplePromise();
             this.__registerListener({ s: onSuccess, promise: p });
             return p;
