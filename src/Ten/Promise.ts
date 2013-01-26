@@ -12,14 +12,6 @@ module Ten {
         constructor () {
             this.__listeners = [];
         }
-        private __notifySuccess() {
-            var val = this.__sucVal;
-            var listeners = this.__listeners;
-            while (listeners.length > 0) {
-                var listener = listeners.shift();
-                this.__notifyListenerOfSuccess(listener, val);
-            }
-        }
         _setValue(valOrPromise) {
             var that = this;
             function setValImpl (val) {
@@ -40,6 +32,26 @@ module Ten {
         }
         cancel() {
         }
+        then(onSuccess: (val) => any): AbstractPromise {
+            var p = new SimplePromise();
+            this.__registerListener({ s: onSuccess, promise: p });
+            return p;
+        }
+        private __registerListener(listener: PromiseListener) {
+            if (this.__stat === STAT_FULFILLED) {
+                this.__notifyListenerOfSuccess(listener, this.__sucVal);
+            } else {
+                this.__listeners.push(listener);
+            }
+        }
+        private __notifySuccess() {
+            var val = this.__sucVal;
+            var listeners = this.__listeners;
+            while (listeners.length > 0) {
+                var listener = listeners.shift();
+                this.__notifyListenerOfSuccess(listener, val);
+            }
+        }
         private __notifyListenerOfSuccess(listener: PromiseListener, value: any) {
             // value or Promise, or exception
             var callbackRes;
@@ -50,18 +62,6 @@ module Ten {
             }
             // 普通の値だったら
             listener.promise._setValue(callbackRes);
-        }
-        private __registerListener(listener: PromiseListener) {
-            if (this.__stat === STAT_FULFILLED) {
-                this.__notifyListenerOfSuccess(listener, this.__sucVal);
-            } else {
-                this.__listeners.push(listener);
-            }
-        }
-        then(onSuccess: (val) => any): AbstractPromise {
-            var p = new SimplePromise();
-            this.__registerListener({ s: onSuccess, promise: p });
-            return p;
         }
     }
     class SimplePromise extends AbstractPromise {}
