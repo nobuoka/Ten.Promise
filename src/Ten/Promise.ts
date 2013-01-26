@@ -3,6 +3,7 @@ module Ten {
         promise?: AbstractPromise;
         s: (val) => any;
         e: (val) => any;
+        p: (val) => void;
     }
     var STAT_EMPTY     = 0;
     var STAT_FULFILLED = 1;
@@ -31,6 +32,8 @@ module Ten {
                     that._fulfill(val);
                 }, function onError(err) {
                     that._setError(err);
+                }, function onProgress(val) {
+                    that._notifyProgress(val);
                 });
             } else {
                 var val = <any>valOrPromise;
@@ -54,19 +57,20 @@ module Ten {
                 this.__promiseVal.cancel();
             }
         }
-        done(onSuccess: (val) => any, onError: (val) => any): void {
-            this.__registerListener(onSuccess, onError);
+        done(onSuccess: (val) => any, onError: (val) => any, onProgress: (val) => void): void {
+            this.__registerListener(onSuccess, onError, onProgress);
         }
-        then(onSuccess: (val) => any, onError: (val) => any): AbstractPromise {
+        then(onSuccess: (val) => any, onError: (val) => any, onProgress: (val) => void): AbstractPromise {
             var p = new SimplePromise();
             p._setParentPromise(this);
-            this.__registerListener(onSuccess, onError, p);
+            this.__registerListener(onSuccess, onError, onProgress, p);
             return p;
         }
-        private __registerListener(onSuccess, onError, promise?) {
+        private __registerListener(onSuccess, onError, onProgress, promise?) {
             if (typeof onSuccess !== "function") onSuccess = ((val) => val);
             if (typeof onError !== "function") onError = ((val) => Promise.wrapError(val));
-            var listener: PromiseListener = { s: onSuccess, e: onError, promise: promise };
+            if (typeof onProgress !== "function") onProgress = function () {};
+            var listener: PromiseListener = { s: onSuccess, e: onError, p: onProgress, promise: promise };
 
             if (this.__stat === STAT_FULFILLED) {
                 var that = this;
@@ -114,14 +118,19 @@ module Ten {
             }
             if (listener.promise) listener.promise._setValue(callbackRes);
         }
-    }
-    class SimplePromise extends AbstractPromise {}
-    class ErrorPromise extends AbstractPromise {
-        constructor(errorValue) {
-            super();
-            this._setError(errorValue);
+        _notifyProgress(val) {
+            var listeners = this.__listeners;
+            for (var i = 0, len = listeners.length; i < len; ++i) {
+                var listener = listeners[i];
+                try {
+                    listener.p(val);
+                } catch (err) {
+                    // do nothing
+                }
+            }
         }
     }
+    class SimplePromise extends AbstractPromise {}
     export class Promise extends AbstractPromise {
         private __onCancel;
         private __thisValue;
@@ -136,8 +145,11 @@ module Ten {
             function err(val) {
                 that._setError(val);
             }
+            function prog(val) {
+                that._notifyProgress(val);
+            }
             try {
-                init.call(this.__thisValue, comp, err);
+                init.call(this.__thisValue, comp, err, prog);
             } catch (err) {
                 // ここどうしよう
             }
@@ -157,7 +169,9 @@ module Ten {
             return p;
         }
         static wrapError(errorValue): AbstractPromise {
-            return new ErrorPromise(errorValue);
+            var p = new SimplePromise();
+            p._setError(errorValue);
+            return p;
         }
     }
 }

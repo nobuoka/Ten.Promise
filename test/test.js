@@ -161,7 +161,7 @@ asyncTest("連続キャンセル", 3, function () {
     p2.cancel();
 });
 
-asyncTest("", function () {
+asyncTest("Promise ではないが then メソッドをもっているオブジェクトを返した場合", function () {
     var sentinel = {};
     var dummy = {};
     var promise1 = Ten.Promise.wrap(dummy);
@@ -173,6 +173,51 @@ asyncTest("", function () {
 
     promise2.then(function onPromise2Fulfilled(value) {
         strictEqual(value, sentinel);
+        QUnit.start();
+    });
+});
+
+asyncTest("Progress", function () {
+    var p = new Ten.Promise(function (s,e,p) {
+        var count = 0;
+        setInterval(function () {
+            ++count;
+            if (count < 5) {
+                p(count);
+            } else {
+                s(count);
+            }
+        }, 50);
+    });
+    var progVal = [];
+    p.then(function (val) {
+        equal(val, 5);
+    }, null, function onProgress(val) {
+        progVal.push(val);
+    }).done(function () {
+        deepEqual(progVal, [1,2,3,4]);
+    });
+
+    p = Ten.Promise.wrap(0).then(function () {
+        return new Ten.Promise(function (s,e,p) {
+            var count = 0;
+            setInterval(function () {
+                ++count;
+                if (count < 5) {
+                    p(-count);
+                } else {
+                    s(-count);
+                }
+            }, 50);
+        });
+    })
+    progVal2 = [];
+    p.then(function (val) {
+        equal(val, -5);
+    }, null, function onProgress(val) {
+        progVal2.push(val);
+    }).done(function () {
+        deepEqual(progVal2, [-1,-2,-3,-4]);
         QUnit.start();
     });
 });
