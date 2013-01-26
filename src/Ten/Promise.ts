@@ -7,13 +7,19 @@ module Ten {
     var STAT_EMPTY     = 0;
     var STAT_FULFILLED = 1;
     var STAT_FAILED    = 2;
+    var STAT_WAITING   = 4;
     export class AbstractPromise {
         private __stat = STAT_EMPTY;
         private __sucVal;
         private __errVal;
+        private __promiseVal;
+        private __parentPromise;
         private __listeners: PromiseListener[];
         constructor () {
             this.__listeners = [];
+        }
+        _setParentPromise(promise) {
+            this.__parentPromise = promise;
         }
         _setValue(valOrPromise) {
             var that = this;
@@ -24,8 +30,9 @@ module Ten {
             }
             if (valOrPromise instanceof AbstractPromise) {
                 var p = <AbstractPromise>valOrPromise;
-                // 本来は done メソッドを使いたい
-                p.then(function (val) {
+                this.__stat = STAT_WAITING;
+                this.__promiseVal = p;
+                p.done(function (val) {
                     setValImpl(val);
                 }, function onError(err) {
                     that._setError(err);
@@ -41,9 +48,20 @@ module Ten {
             this.__notifyFailure();
         }
         cancel() {
+            if (this.__stat === STAT_EMPTY) {
+                if (this.__parentPromise) this.__parentPromise.cancel();
+            } else if (this.__stat === STAT_WAITING) {
+                this.__promiseVal.cancel();
+            }
+        }
+        done(onSuccess: (val) => any, onError: (val) => any): void {
+            if (!onSuccess) onSuccess = ((val) => val);
+            if (!onError) onError = ((val) => Promise.wrapError(val));
+            this.__registerListener({ s: onSuccess, e: onError });
         }
         then(onSuccess: (val) => any, onError: (val) => any): AbstractPromise {
             var p = new SimplePromise();
+            p._setParentPromise(this);
             if (!onSuccess) onSuccess = ((val) => val);
             if (!onError) onError = ((val) => Promise.wrapError(val));
             this.__registerListener({ s: onSuccess, e: onError, promise: p });
@@ -74,8 +92,7 @@ module Ten {
             } catch (err) {
                 callbackRes = Promise.wrapError(err);
             }
-            // 普通の値だったら
-            listener.promise._setValue(callbackRes);
+            if (listener.promise) listener.promise._setValue(callbackRes);
         }
         private __notifyFailure() {
             var val = this.__errVal;
@@ -93,8 +110,7 @@ module Ten {
             } catch (err) {
                 callbackRes = Promise.wrapError(err);
             }
-            // 普通の値だったら
-            listener.promise._setValue(callbackRes);
+            if (listener.promise) listener.promise._setValue(callbackRes);
         }
     }
     class SimplePromise extends AbstractPromise {}
@@ -106,8 +122,10 @@ module Ten {
     }
     export class Promise extends AbstractPromise {
         private __onCancel;
+        private __thisValue;
         constructor(init, onCancel?) {
             super();
+            this.__thisValue = {};
             this.__onCancel = onCancel;
             var that = this;
             function comp(val) {
@@ -117,10 +135,14 @@ module Ten {
                 that._setError(val);
             }
             try {
-                init(comp, err);
+                init.call(this.__thisValue, comp, err);
             } catch (err) {
                 // ここどうしよう
             }
+        }
+        cancel() {
+            if (this.__onCancel) this.__onCancel.call(this.__thisValue);
+            this._setError({ description: "Canceled" });
         }
 
         static wrapError(errorValue): AbstractPromise {

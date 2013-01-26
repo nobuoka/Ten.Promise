@@ -53,7 +53,7 @@ asyncTest("Ten.Promise を非同期呼び出しで使う", function () {
     });
 });
 
-asyncTest("エラーの処理", function () {
+asyncTest("エラーの処理", 5, function () {
     var p = new Ten.Promise(function (suc, err) {
         err("よくないことが起こった");
     });
@@ -73,7 +73,13 @@ asyncTest("エラーの処理", function () {
     }).
     then(null, function onError(err) {
         equal(err, "error in error handler");
-        QUnit.start();
+    });
+
+    p.then(null, function () {}).done(function () {
+        p.done(null, function (err) {
+            equal(err, "よくないことが起こった");
+            QUnit.start();
+        });
     });
 });
 
@@ -96,6 +102,55 @@ asyncTest("エラーの非同期処理", function () {
         equal(val, 120);
         QUnit.start();
     });
+});
+
+asyncTest("キャンセル", 3, function () {
+    var p = new Ten.Promise(function (suc, err) {
+        this.__timerId = setTimeout(function () {
+            err("よくないことが起こった");
+        }, 200);
+    }, function onCancel() {
+        ok("ここまで着てない?");
+        clearTimeout(this.__timerId);
+    });
+    p2 = p.then(function (val) {
+    }, function onError(err) {
+        equal(err.description, "Canceled");
+        return new Ten.Promise(function (s,e) {
+            setTimeout(function () { e(120) }, 200);
+        });
+    }).
+    then(null, null). // 貫通する
+    then(null, function onError(val) {
+        equal(val, 120);
+    });
+    p2.done(function () { QUnit.start() });
+    p.cancel();
+});
+
+asyncTest("連続キャンセル", 3, function () {
+    var p = new Ten.Promise(function (suc, err) {
+        this.__timerId = setTimeout(function () {
+            err("よくないことが起こった");
+        }, 200);
+    }, function onCancel() {
+        ok("ここまで着てない?");
+        clearTimeout(this.__timerId);
+    });
+    p2 = p.then(function (val) {
+    }, function onError(err) {
+        equal(err.description, "Canceled");
+        return new Ten.Promise(function (s,e) {
+            setTimeout(function () { e(120) }, 200);
+        });
+    }).
+    then(null, null). // 貫通する
+    then(null, function onError(err) {
+        equal(err.description, "Canceled");
+    });
+    p2.done(function () { QUnit.start() });
+    p2.cancel();
+    p2.cancel();
 });
 
 
