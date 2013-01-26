@@ -23,24 +23,24 @@ module Ten {
         }
         _setValue(valOrPromise) {
             var that = this;
-            function setValImpl (val) {
-                that.__stat = STAT_FULFILLED;
-                that.__sucVal = val;
-                that.__notifySuccess();
-            }
             if (valOrPromise && typeof valOrPromise.then === "function") {
                 var p = <AbstractPromise>valOrPromise;
                 this.__stat = STAT_WAITING;
                 this.__promiseVal = p;
                 p.then(function (val) {
-                    setValImpl(val);
+                    that._fulfill(val);
                 }, function onError(err) {
                     that._setError(err);
                 });
             } else {
                 var val = <any>valOrPromise;
-                setValImpl(val);
+                this._fulfill(val);
             }
+        }
+        _fulfill(value) {
+                this.__stat = STAT_FULFILLED;
+                this.__sucVal = value;
+                this.__notifySuccess();
         }
         _setError(errorValue) {
             this.__stat = STAT_FAILED;
@@ -55,23 +55,25 @@ module Ten {
             }
         }
         done(onSuccess: (val) => any, onError: (val) => any): void {
-            if (!onSuccess) onSuccess = ((val) => val);
-            if (!onError) onError = ((val) => Promise.wrapError(val));
-            this.__registerListener({ s: onSuccess, e: onError });
+            this.__registerListener(onSuccess, onError);
         }
         then(onSuccess: (val) => any, onError: (val) => any): AbstractPromise {
             var p = new SimplePromise();
             p._setParentPromise(this);
-            if (!onSuccess) onSuccess = ((val) => val);
-            if (!onError) onError = ((val) => Promise.wrapError(val));
-            this.__registerListener({ s: onSuccess, e: onError, promise: p });
+            this.__registerListener(onSuccess, onError, p);
             return p;
         }
-        private __registerListener(listener: PromiseListener) {
+        private __registerListener(onSuccess, onError, promise?) {
+            if (typeof onSuccess !== "function") onSuccess = ((val) => val);
+            if (typeof onError !== "function") onError = ((val) => Promise.wrapError(val));
+            var listener: PromiseListener = { s: onSuccess, e: onError, promise: promise };
+
             if (this.__stat === STAT_FULFILLED) {
-                this.__notifyListenerOfSuccess(listener, this.__sucVal);
+                var that = this;
+                Promise.callInCaseAlreadyCompleted(function () { that.__notifyListenerOfSuccess(listener, that.__sucVal) });
             } else if (this.__stat === STAT_FAILED) {
-                this.__notifyListenerOfFailure(listener, this.__errVal);
+                var that = this;
+                Promise.callInCaseAlreadyCompleted(function () { that.__notifyListenerOfFailure(listener, that.__errVal) });
             } else {
                 this.__listeners.push(listener);
             }
@@ -145,6 +147,15 @@ module Ten {
             this._setError({ description: "Canceled" });
         }
 
+        static callInCaseAlreadyCompleted(caller) {
+            //setTimeout(caller, 4);
+            caller();
+        }
+        static wrap(value): AbstractPromise {
+            var p = new SimplePromise();
+            p._fulfill(value);
+            return p;
+        }
         static wrapError(errorValue): AbstractPromise {
             return new ErrorPromise(errorValue);
         }

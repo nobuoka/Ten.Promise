@@ -84,6 +84,14 @@ asyncTest("エラーの処理", 5, function () {
 });
 
 asyncTest("エラーの非同期処理", function () {
+    var p = Ten.Promise.wrapError("error");
+    p.then(null, function onError(err) {
+        equal(err, "error");
+    });
+    QUnit.start();
+});
+
+asyncTest("エラーの非同期処理", function () {
     var p = new Ten.Promise(function (suc, err) {
         setTimeout(function () {
             err("よくないことが起こった");
@@ -153,4 +161,18 @@ asyncTest("連続キャンセル", 3, function () {
     p2.cancel();
 });
 
+asyncTest("", function () {
+    var sentinel = {};
+    var dummy = {};
+    var promise1 = Ten.Promise.wrap(dummy);
+    var promise2 = promise1.then(function onFulfilled() {
+        return {
+            then: function (f) { f(sentinel); }
+        };
+    });
 
+    promise2.then(function onPromise2Fulfilled(value) {
+        strictEqual(value, sentinel);
+        QUnit.start();
+    });
+});
