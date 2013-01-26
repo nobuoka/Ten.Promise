@@ -52,3 +52,50 @@ asyncTest("Ten.Promise を非同期呼び出しで使う", function () {
         QUnit.start();
     });
 });
+
+asyncTest("エラーの処理", function () {
+    var p = new Ten.Promise(function (suc, err) {
+        err("よくないことが起こった");
+    });
+
+    p.then(function (val) {
+    }, function onError(err) {
+        equal(err, "よくないことが起こった");
+        return 120;
+    }).
+    then(function (val) {
+        equal(val, 120);
+        throw "error dayo";
+    }).
+    then(null, function onError(err) {
+        equal(err, "error dayo");
+        throw "error in error handler";
+    }).
+    then(null, function onError(err) {
+        equal(err, "error in error handler");
+        QUnit.start();
+    });
+});
+
+asyncTest("エラーの非同期処理", function () {
+    var p = new Ten.Promise(function (suc, err) {
+        setTimeout(function () {
+            err("よくないことが起こった");
+        }, 200);
+    });
+
+    p.then(function (val) {
+    }, function onError(err) {
+        equal(err, "よくないことが起こった");
+        return new Ten.Promise(function (s,e) {
+            setTimeout(function () { e(120) }, 200);
+        });
+    }).
+    then(null, null). // 貫通する
+    then(null, function onError(val) {
+        equal(val, 120);
+        QUnit.start();
+    });
+});
+
+
