@@ -280,13 +280,18 @@ module Ten {
         }
         // for test... よくない
         init() {}
-        call(val) {
+        call(val?) {
             this._setValue(val);
         }
         fail(err) {
             this._setError(err);
         }
         callback: any;
+        canceller: any;
+        cancel() {
+            if (this.canceller) this.canceller();
+            AbstractPromise.prototype.cancel.call(this);
+        }
 
         static ok(val) { return val }
         static next(callback) {
@@ -348,6 +353,58 @@ module Ten {
                 return (o.begin <= o.end) ? PromiseWithJSDeferredInterface.call(_loop, o.begin) : null;
             });
         }
+        static repeat(n, fun) {
+            var i = 0, end = {}, ret = null;
+            return PromiseWithJSDeferredInterface.next(function () {
+                var t = (new Date()).getTime();
+                do {
+                    if (i >= n) return null;
+                    ret = fun(i++);
+                } while ((new Date()).getTime() - t < 20);
+                return PromiseWithJSDeferredInterface.call(arguments.callee);
+            });
+        }
+        static parallel(obj, ...args: any[]) {
+            if (arguments.length > 1) {
+                var obj = Array.prototype.slice.call(arguments);
+            }
+            for (var name in obj) {
+                if (typeof obj[name] === "function") obj[name] = PromiseWithJSDeferredInterface.next(obj[name]);
+            }
+            return Promise.join(obj);
+        }
+        static earlier(dl) {
+            var isArray = false;
+            if (arguments.length > 1) {
+                dl = Array.prototype.slice.call(arguments);
+                isArray = true;
+            } else if (Array.isArray && Array.isArray(dl) || typeof dl.length == "number") {
+                isArray = true;
+            }
+            var ret = new PromiseWithJSDeferredInterface(), values = { length: 0 }, num = 0;
+            for (var i in dl) if (dl.hasOwnProperty(i)) (function (d, i) {
+                d.next(function (v) {
+                    values[i] = v;
+                    if (isArray) {
+                        values.length = dl.length;
+                        values = Array.prototype.slice.call(values, 0);
+                    }
+                    ret.call(values);
+                    ret.canceller();
+                }).error(function (e) {
+                    ret.fail(e);
+                });
+                num++;
+            })(dl[i], i);
+
+            if (!num) PromiseWithJSDeferredInterface.next(function () { ret.call() });
+            ret.canceller = function () {
+                for (var i in dl) if (dl.hasOwnProperty(i)) {
+                    dl[i].cancel();
+                }
+            };
+            return ret;
+        };
         static onerror: any;
         // これはこれでいいのか...?
         static isDeferred = function (val) {
