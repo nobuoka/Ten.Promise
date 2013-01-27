@@ -1,6 +1,12 @@
 module Ten {
     "use strict";
 
+    var CANCELED_NAME = "Canceled";
+    var CANCELED_DESC = "Canceled";
+    function createCancelEvent() {
+        return { name: CANCELED_NAME, description: CANCELED_DESC };
+    }
+
     interface PromiseListener {
         promise?: AbstractPromise;
         s: (val) => any;
@@ -152,7 +158,7 @@ module Ten {
         }
         cancel() {
             if (this.__onCancel) this.__onCancel.call(this.__thisValue);
-            this._setError({ description: "Canceled" });
+            this._setError(createCancelEvent());
         }
 
         static is(value) {
@@ -203,17 +209,39 @@ module Ten {
         }
         static join(values) {
             var numErrors = 0;
+            var numCanceled = 0;
             var errors = {};
             var fulfilleds = {};
             var p = Promise.waitAll(values).then(function (values) {
+                if (numErrors === 0) {
+                    // all success
+                    for (var name in fulfilleds) {
+                        values[name] = fulfilleds[name];
+                    }
+                    return values;
+                } else if (numErrors - numCanceled === 0) {
+                    // no error (except canceled) and al least one canceled
+                    throw createCancelEvent();
+                } else {
+                    // at least one error (except canceled)
+                    throw errors;
+                }
             }, null, function (dat) {
                 if (dat.isError) {
                     fulfilleds[dat.key] = dat.value;
                 } else {
                     numErrors++;
+                    if (dat.value && dat.value.name === CANCELED_NAME) numCanceled++;
                     errors[dat.key] = dat.value;
                 }
             });
+            var origCancel = p.cancel;
+            p.cancel = function () {
+                for (var name in values) {
+                    var v = values[name];
+                    if (Promise.is(v)) v.cancel();
+                }
+            };
         }
     }
 }
