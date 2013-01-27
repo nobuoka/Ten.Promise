@@ -9,14 +9,16 @@ module Ten {
         return e;
     }
 
+    var Arguments = function (args) { this.args = Array.prototype.slice.call(args, 0) };
+
     var errorManager = {
         notify: function (err) {
-            console.log("notify error: " + err);
             if (PromiseWithJSDeferredInterface.onerror) PromiseWithJSDeferredInterface.onerror(err);
         }
     };
 
     interface PromiseListener {
+        isInternal: bool;
         promise?: AbstractPromise;
         s: (val) => any;
         e: (val) => any;
@@ -47,7 +49,7 @@ module Ten {
                 var p = <AbstractPromise>valOrPromise;
                 this.__stat = STAT_WAITING;
                 this.__promiseVal = p;
-                p.then(function (val) {
+                p.__then(function (val) {
                     that._fulfill(val);
                 }, function onError(err) {
                     that._setError(err);
@@ -80,16 +82,20 @@ module Ten {
             this.__registerListener(onSuccess, onError, onProgress);
         }
         then(onSuccess?: (val) => any, onError?: (val) => any, onProgress?: (val) => void): AbstractPromise {
+            return this.__then(onSuccess, onError, onProgress, false);
+        }
+        // JSDeferred.connect で複数の値をコールバック関数に返すためのもの
+        private __then(onSuccess?: (val) => any, onError?: (val) => any, onProgress?: (val) => void, isInternal = true): AbstractPromise {
             var p = new SimplePromise();
             p._setParentPromise(this);
-            this.__registerListener(onSuccess, onError, onProgress, p);
+            this.__registerListener(onSuccess, onError, onProgress, p, isInternal);
             return p;
         }
-        private __registerListener(onSuccess, onError, onProgress, promise?) {
+        private __registerListener(onSuccess, onError, onProgress, promise?, isInternal = false) {
             if (typeof onSuccess !== "function") onSuccess = ((val) => val);
             if (typeof onError !== "function") onError = ((val) => Promise.wrapError(val));
             if (typeof onProgress !== "function") onProgress = function () {};
-            var listener: PromiseListener = { s: onSuccess, e: onError, p: onProgress, promise: promise };
+            var listener: PromiseListener = { s: onSuccess, e: onError, p: onProgress, promise: promise, isInternal: isInternal };
 
             if (this.__stat === STAT_FULFILLED) {
                 var that = this;
@@ -112,12 +118,22 @@ module Ten {
         private __notifyListenerOfSuccess(listener: PromiseListener, value: any) {
             // value or Promise, or exception
             var callbackRes;
+            var errOccured = false;
             try {
-                callbackRes = listener.s(value);
+                var args;
+                args = (!listener.isInternal && value instanceof Arguments) ? value.args : [value];
+                callbackRes = listener.s.apply(null, args);
             } catch (err) {
-                callbackRes = Promise.wrapError(err);
+                errOccured = true;
+                callbackRes = err;
             }
-            if (listener.promise) listener.promise._setValue(callbackRes);
+            if (listener.promise) {
+                if (errOccured) {
+                    listener.promise._setError(callbackRes);
+                } else {
+                    listener.promise._setValue(callbackRes);
+                }
+            }
         }
         private __notifyFailure() {
             var val = this.__errVal;
@@ -132,7 +148,7 @@ module Ten {
             // value or Promise, or exception
             var callbackRes;
             try {
-                callbackRes = listener.e(error);
+                callbackRes = listener.e.call(null, error);
             } catch (err) {
                 callbackRes = Promise.wrapError(err);
             }
@@ -294,7 +310,7 @@ module Ten {
         }
 
         static ok(val) { return val }
-        static next(callback) {
+        static next(callback?) {
             return new Promise(function (s) {
                 var that = this;
                 Promise.callInCaseAlreadyCompleted(function () {
@@ -405,6 +421,108 @@ module Ten {
             };
             return ret;
         };
+        static chain() {
+            var chain = PromiseWithJSDeferredInterface.next();
+            for (var i = 0, len = arguments.length; i < len; i++) (function (obj) {
+                switch (typeof obj) {
+                case "function":
+                    var name = null;
+                    try {
+                        name = obj.toString().match(/^\s*function\s+([^\s()]+)/)[1];
+                    } catch (e) { }
+                    if (name != "error") {
+                        chain = chain.next(obj);
+                    } else {
+                        chain = chain.error(obj);
+                    }
+                    break;
+                case "object":
+                    chain = chain.next(function() { return PromiseWithJSDeferredInterface.parallel(obj) });
+                    break;
+                default:
+                    throw "unknown type in process chains";
+                }
+            })(arguments[i]);
+            return chain;
+        }
+
+        static connect(arg1, arg2, arg3?) {
+            var target, func, opts;
+            if (typeof arg2 === "string") {
+                target = arg1;
+                func   = target[arg2];
+                opts   = arg3 || {};
+            } else {
+                func   = arg1;
+                opts   = arg2 || {};
+                target = opts.target;
+            }
+            // 既定の引数
+            var partialArgs       = opts.args ? Array.prototype.slice.call(opts.args, 0) : [];
+            var callbackArgIndex  = isFinite(opts.ok) ? opts.ok : opts.args ? opts.args.length : undefined;
+            var errorbackArgIndex = opts.ng;
+            return function () {
+                var args = partialArgs.concat(Array.prototype.slice.call(arguments, 0));
+                if (!(isFinite(callbackArgIndex) && callbackArgIndex !== null)) {
+                    callbackArgIndex = args.length;
+                }
+
+                var p = new Promise(function (c,e) {
+                    // callback 設定
+                    var callback = function () { c(new Arguments(arguments)) };
+                    args.splice(callbackArgIndex, 0, callback);
+                    // エラーコールバック設定
+                    if (isFinite(errorbackArgIndex) && errorbackArgIndex !== null) {
+                        // TODO d.fail って複数引数とれるの?
+                        //var errorback = function () { d.fail(arguments) };
+                        var errorback = function (err) { e(arguments) };
+                        args.splice(errorbackArgIndex, 0, errorback);
+                    }
+                    //Deferred.next(function () { func.apply(target, args) });
+                    func.apply(target, args);
+                });
+                /*
+                var nextCallback;
+                var p2 = p.then(function (args) {
+                    return nextCallback ? nextCallback.apply(this, args.args) : null;
+                    var next = this._next.callback.ok;
+                    this._next.callback.ok = function () {
+                        return next.apply(this, args.args);
+                    };
+                });
+                p.then = function (c?,e?,p?) {
+                    // TODO 複数個
+                    nextCallback = c;
+                    return p2;
+                };
+                */
+                return p;
+            };
+        }
+
+        static retry(retryCount, funcDeferred, options) {
+            if (!options) options = {};
+
+            var wait = options.wait || 0;
+            var d = new PromiseWithJSDeferredInterface();
+            var retry = function () {
+                var m = funcDeferred(retryCount);
+                m.
+                next(function (mes) {
+                    d.call(mes);
+                }).
+                error(function (e) {
+                    if (--retryCount <= 0) {
+                        d.fail(['retry failed', e]);
+                    } else {
+                        setTimeout(retry, wait * 1000);
+                    }
+                });
+            };
+            setTimeout(retry, 0);
+            return d;
+        }
+
         static onerror: any;
         // これはこれでいいのか...?
         static isDeferred = function (val) {
