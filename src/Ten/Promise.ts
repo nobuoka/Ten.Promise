@@ -20,13 +20,15 @@ module Ten {
     var STAT_FAILED    = 2;
     var STAT_WAITING   = 4;
     export class AbstractPromise {
-        private __stat = STAT_EMPTY;
+        private __stat;//= STAT_EMPTY;
         private __sucVal;
         private __errVal;
         private __promiseVal;
         private __parentPromise;
         private __listeners: PromiseListener[];
         constructor () {
+            if (!(this instanceof AbstractPromise)) return null;
+            this.__stat = STAT_EMPTY;
             this.__listeners = [];
         }
         _setParentPromise(promise) {
@@ -70,7 +72,7 @@ module Ten {
         done(onSuccess: (val) => any, onError: (val) => any, onProgress: (val) => void): void {
             this.__registerListener(onSuccess, onError, onProgress);
         }
-        then(onSuccess: (val) => any, onError: (val) => any, onProgress: (val) => void): AbstractPromise {
+        then(onSuccess?: (val) => any, onError?: (val) => any, onProgress?: (val) => void): AbstractPromise {
             var p = new SimplePromise();
             p._setParentPromise(this);
             this.__registerListener(onSuccess, onError, onProgress, p);
