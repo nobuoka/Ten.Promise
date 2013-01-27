@@ -363,4 +363,36 @@ asyncTest("Promise.join - with cancel", 1, function () {
     p.cancel();
 });
 
+asyncTest("", function () {
+    Ten.Promise.JSDeferredInterface.next(function () { throw "Error"; }).
+    error(function (e) {
+        equal(e, "Error", "Errorback called");
+        return e;
+    }).
+    next(function (e) {
+        equal(e, "Error", "Errorback called");
+        throw "Error2";
+    }).
+    next(function (e) {
+        ok(false, "Must not be called!!");
+    }).
+    error(function (e) {
+        equal(e, "Error2", "Errorback called");
+        QUnit.start();
+    });
+});
 
+asyncTest("Canceling Test:", function () {
+    Ten.Promise.JSDeferredInterface.next(function () {
+        return Ten.Promise.JSDeferredInterface.next(function () {
+            //msg("Calceling... No more tests below...");
+            ok(true, "Done");
+            this.cancel();
+        }).
+        next(function () {
+            ok(false, "Must not be called!! calceled");
+        }).error(function () {
+            QUnit.start();
+        });
+    });
+});

@@ -9,6 +9,13 @@ module Ten {
         return e;
     }
 
+    var errorManager = {
+        notify: function (err) {
+            console.log("notify error: " + err);
+            if (PromiseWithJSDeferredInterface.onerror) PromiseWithJSDeferredInterface.onerror(err);
+        }
+    };
+
     interface PromiseListener {
         promise?: AbstractPromise;
         s: (val) => any;
@@ -114,6 +121,7 @@ module Ten {
         }
         private __notifyFailure() {
             var val = this.__errVal;
+            errorManager.notify(val);
             var listeners = this.__listeners;
             while (listeners.length > 0) {
                 var listener = listeners.shift();
@@ -140,6 +148,13 @@ module Ten {
                     // do nothing
                 }
             }
+        }
+
+        next(callback: {(val): AbstractPromise;}) {
+            return this.then(callback);
+        }
+        error(callback: {(val): AbstractPromise;}) {
+            return this.then(null, callback);
         }
     }
     class SimplePromise extends AbstractPromise {}
@@ -250,7 +265,117 @@ module Ten {
             };
             return p;
         }
+        static JSDeferredInterface;
     }
+
+    class PromiseWithJSDeferredInterface extends AbstractPromise {
+        static methods = ["parallel", "wait", "next", "call", "loop", "repeat", "chain"];
+        static define: any;
+        static register: any;
+
+        constructor() {
+            super();
+            if (!(this instanceof PromiseWithJSDeferredInterface)) return new PromiseWithJSDeferredInterface();
+            this.callback = { ok: (x) => x, ng: (x) => x };
+        }
+        // for test... よくない
+        init() {}
+        call(val) {
+            this._setValue(val);
+        }
+        fail(err) {
+            this._setError(err);
+        }
+        callback: any;
+
+        static ok(val) { return val }
+        static next(callback) {
+            return new Promise(function (s) {
+                var that = this;
+                Promise.callInCaseAlreadyCompleted(function () {
+                    if (!that.canceled) s(void 0);
+                });
+            }, function onCancel {
+                this.canceled = true;
+            }).then(callback);
+        }
+        static wait(timesec) {
+            return new Promise(function (c) {
+                var curTime = new Date();
+                this.timerId = setTimeout(function () {
+                    c((new Date()).getTime() - curTime.getTime());
+                }, timesec * 1000);
+            }, function onCancel() {
+                clearTimeout(this.timerId);
+            });
+        }
+        static call(fun, ...args: any[]) {
+            var args = Array.prototype.slice.call(arguments, 1);
+            return PromiseWithJSDeferredInterface.next(function () {
+                return fun.apply(this, args);
+            });
+        }
+        static loop(n, fun) {
+            var o = {
+                begin : n.begin || 0,
+                end   : (typeof n.end == "number") ? n.end : n - 1,
+                step  : n.step  || 1,
+                last  : false,
+                prev  : null
+            };
+            var ret, step = o.step;
+            return PromiseWithJSDeferredInterface.next(function () {
+                function _loop (i) {
+                    if (i <= o.end) {
+                        if ((i + step) > o.end) {
+                            o.last = true;
+                            o.step = o.end - i + 1;
+                        }
+                        o.prev = ret;
+                        ret = fun.call(this, i, o);
+                        if (PromiseWithJSDeferredInterface.isDeferred(ret)) {
+                            return ret.next(function (r) {
+                                ret = r;
+                                return PromiseWithJSDeferredInterface.call(_loop, i + step);
+                            });
+                        } else {
+                            return PromiseWithJSDeferredInterface.call(_loop, i + step);
+                        }
+                    } else {
+                        return ret;
+                    }
+                }
+                return (o.begin <= o.end) ? PromiseWithJSDeferredInterface.call(_loop, o.begin) : null;
+            });
+        }
+        static onerror: any;
+        // これはこれでいいのか...?
+        static isDeferred = function (val) {
+            return !!val && val["__classId__"] === 3424234239;
+        };
+    }
+    // テストよう... よくない
+    PromiseWithJSDeferredInterface.prototype["__classId__"] = 3424234239;
+    PromiseWithJSDeferredInterface.define = function (obj, list) {
+        if (!list) list = PromiseWithJSDeferredInterface.methods;
+        if (!obj)  obj  = ("global",eval)("this");//{};//(function getGlobal () { return this })();
+        for (var i = 0; i < list.length; i++) {
+            var n = list[i];
+            obj[n] = PromiseWithJSDeferredInterface[n];
+        }
+        return PromiseWithJSDeferredInterface; // クラス内でそのクラスを返すようなコードはかけない?
+    };
+    PromiseWithJSDeferredInterface.register = function (name, fun) {
+        AbstractPromise.prototype[name] = function () {
+            var a = arguments;
+            return this.next(function () {
+                return fun.apply(this, a);
+            });
+        };
+    };
+    PromiseWithJSDeferredInterface.register("wait", PromiseWithJSDeferredInterface.wait);
+    PromiseWithJSDeferredInterface.register("loop", PromiseWithJSDeferredInterface.loop);
+    Promise.JSDeferredInterface = PromiseWithJSDeferredInterface;
 }
 
 declare var process;
@@ -288,3 +413,4 @@ declare var MessageChannel;
         };
     }
 }).call(this);
+
