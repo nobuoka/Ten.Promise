@@ -1,4 +1,6 @@
 module Ten {
+    "use strict";
+
     interface PromiseListener {
         promise?: AbstractPromise;
         s: (val) => any;
@@ -24,7 +26,7 @@ module Ten {
         }
         _setValue(valOrPromise) {
             var that = this;
-            if (valOrPromise && typeof valOrPromise.then === "function") {
+            if (Promise.is(valOrPromise)) {
                 var p = <AbstractPromise>valOrPromise;
                 this.__stat = STAT_WAITING;
                 this.__promiseVal = p;
@@ -41,9 +43,9 @@ module Ten {
             }
         }
         _fulfill(value) {
-                this.__stat = STAT_FULFILLED;
-                this.__sucVal = value;
-                this.__notifySuccess();
+            this.__stat = STAT_FULFILLED;
+            this.__sucVal = value;
+            this.__notifySuccess();
         }
         _setError(errorValue) {
             this.__stat = STAT_FAILED;
@@ -139,15 +141,9 @@ module Ten {
             this.__thisValue = {};
             this.__onCancel = onCancel;
             var that = this;
-            function comp(val) {
-                that._setValue(val);
-            }
-            function err(val) {
-                that._setError(val);
-            }
-            function prog(val) {
-                that._notifyProgress(val);
-            }
+            function comp(val) { that._setValue(val) }
+            function err(val)  { that._setError(val) }
+            function prog(val) { that._notifyProgress(val) }
             try {
                 init.call(this.__thisValue, comp, err, prog);
             } catch (err) {
@@ -159,9 +155,12 @@ module Ten {
             this._setError({ description: "Canceled" });
         }
 
-        static callInCaseAlreadyCompleted(caller) {
-            //setTimeout(caller, 4);
-            caller();
+        static is(value) {
+            return (value && typeof value.then === "function");
+        }
+        static callInCaseAlreadyCompleted: {(caller: any): void;} = null;
+        static as(value) {
+            return (Promise.is(value) ? value : Promise.wrap(value));
         }
         static wrap(value): AbstractPromise {
             var p = new SimplePromise();
@@ -173,5 +172,82 @@ module Ten {
             p._setError(errorValue);
             return p;
         }
+
+        static waitAll(values) {
+            return new Promise(
+                function (complete, error, progress) {
+                    var count = 0;
+                    function onCompleted(name, val, isError) {
+                        count--;
+                        var obj = { done: true, key: name, isError: isError, error: void 0, value: void 0 };
+                        isError ? obj.error = val : obj.value = val;
+                        progress(obj);
+                        if (count === 0) complete(values);
+                    }
+                    for (var name in values) {
+                        var val = values[name];
+                        if (Promise.is(val)) {
+                            count++;
+                            (function (name, promise) {
+                                promise.then(function (val) {
+                                    onCompleted(name, val, false);
+                                }, function onError(err) {
+                                    onCompleted(name, err, true);
+                                });
+                            })(name, val);
+                        }
+                    }
+                    if (count === 0) complete(values);
+                }
+            );
+        }
+        static join(values) {
+            var numErrors = 0;
+            var errors = {};
+            var fulfilleds = {};
+            var p = Promise.waitAll(values).then(function (values) {
+            }, null, function (dat) {
+                if (dat.isError) {
+                    fulfilleds[dat.key] = dat.value;
+                } else {
+                    numErrors++;
+                    errors[dat.key] = dat.value;
+                }
+            });
+        }
     }
 }
+
+declare var process;
+declare var setImmediate;
+declare var MessageChannel;
+(function setupCallbackFunction() {
+    "use strict";
+    if (typeof process === "object" && typeof process.nextTick === "function") {
+        // for Node
+        Ten.Promise.callInCaseAlreadyCompleted = function (c) { process.nextTick(c) };
+    } else if (typeof setImmediate === "function") {
+        Ten.Promise.callInCaseAlreadyCompleted = function (c) { setImmediate(c) };
+    } else if (typeof MessageChannel === "function") {
+        Ten.Promise.callInCaseAlreadyCompleted = function (c) {
+            var ch = new MessageChannel();
+            ch.port1.onmessage = function() {
+                ch.port1.onmessage = null; ch = null;
+                c();
+            };
+            ch.port2.postMessage(0);
+        };
+    } else if (typeof window === "object" && typeof window.postMessage === "function"
+               && typeof window.addEventListener === "function") {
+        Ten.Promise.callInCaseAlreadyCompleted = function (c) {
+            window.addEventListener("message", function onMessage(evt) {
+                window.removeEventListener("message", onMessage, false);
+                c();
+            }, false);
+            window.postMessage("triger of function call", "*");
+        };
+    } else {
+        // fallback (it can't pass test...)
+        Ten.Promise.callInCaseAlreadyCompleted = function (c) { c() };
+    }
+}).call(this);

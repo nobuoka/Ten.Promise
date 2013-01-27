@@ -87,8 +87,8 @@ asyncTest("エラーの非同期処理", function () {
     var p = Ten.Promise.wrapError("error");
     p.then(null, function onError(err) {
         equal(err, "error");
+        QUnit.start();
     });
-    QUnit.start();
 });
 
 asyncTest("エラーの非同期処理", function () {
@@ -218,6 +218,79 @@ asyncTest("Progress", function () {
         progVal2.push(val);
     }).done(function () {
         deepEqual(progVal2, [-1,-2,-3,-4]);
+        QUnit.start();
+    });
+});
+
+test("Promise.is", function () {
+    var p = Ten.Promise.wrap(0);
+    ok(Ten.Promise.is(p));
+    ok(Ten.Promise.is({ then: function () {} }));
+
+    ok(!Ten.Promise.is(null));
+    ok(!Ten.Promise.is(undefined));
+    ok(!Ten.Promise.is(5));
+    ok(!Ten.Promise.is({}));
+    ok(!Ten.Promise.is({ then: null }));
+});
+
+asyncTest("`then` method of already fulfilled Promise", function () {
+    var flag = true;
+    var p = Ten.Promise.wrap(0);
+    p.then(function () {
+        ok(flag);
+        QUnit.start();
+    });
+    flag = true;
+});
+
+asyncTest("Promise.as", function () {
+    Ten.Promise.wrap(0).
+    then(function () {
+        return Ten.Promise.as(0);
+    }).
+    then(function (val) {
+        equal(val, 0);
+    }).
+    then(function () {
+        return Ten.Promise.as(Ten.Promise.wrap(10));
+    }).
+    then(function (val) {
+        equal(val, 10);
+    }).
+    done(function () {
+        QUnit.start();
+    });
+});
+
+asyncTest("Promise.waitAll", 2, function () {
+    var progvals = [];
+    Ten.Promise.waitAll([
+        new Ten.Promise(function (s,e,p) { setTimeout(function () { s("a") }, 20) }),
+        new Ten.Promise(function (s,e,p) { setTimeout(function () { s("b") }, 30) }),
+        new Ten.Promise(function (s,e,p) { setTimeout(function () { s("c") }, 40) })
+    ]).then(function () {
+        ok("ok");
+    }, null, function onProgress (dat) {
+        progvals.push([ dat.key, dat.value ]);
+    }).done(function () {
+        deepEqual(progvals, [["0","a"], ["1","b"], ["2","c"]]);
+        QUnit.start();
+    });
+});
+
+asyncTest("Promise.waitAll - waiting not promise values", 2, function () {
+    var progvals2 = [];
+    Ten.Promise.waitAll([
+        null,
+        100,
+        {}
+    ]).then(function () {
+        ok("ok");
+    }, null, function onProgress (dat) {
+        progvals2.push([ dat.key, dat.value ]);
+    }).done(function () {
+        deepEqual(progvals2, []);
         QUnit.start();
     });
 });
