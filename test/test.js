@@ -123,7 +123,7 @@ asyncTest("キャンセル", 3, function () {
     });
     p2 = p.then(function (val) {
     }, function onError(err) {
-        equal(err.description, "Canceled");
+        equal(err.name, "Canceled");
         return new Ten.Promise(function (s,e) {
             setTimeout(function () { e(120) }, 200);
         });
@@ -147,14 +147,14 @@ asyncTest("連続キャンセル", 3, function () {
     });
     p2 = p.then(function (val) {
     }, function onError(err) {
-        equal(err.description, "Canceled");
+        equal(err.name, "Canceled");
         return new Ten.Promise(function (s,e) {
             setTimeout(function () { e(120) }, 200);
         });
     }).
     then(null, null). // 貫通する
     then(null, function onError(err) {
-        equal(err.description, "Canceled");
+        equal(err.name, "Canceled");
     });
     p2.done(function () { QUnit.start() });
     p2.cancel();
@@ -294,3 +294,73 @@ asyncTest("Promise.waitAll - waiting not promise values", 2, function () {
         QUnit.start();
     });
 });
+
+asyncTest("Promise.waitAll - waiting fulfilled promise values", 1, function () {
+    var values = [
+        Ten.Promise.wrap(100),
+        Ten.Promise.wrap(200)
+    ];
+    Ten.Promise.waitAll(values).
+    then(function (v) {
+        deepEqual(v, values);
+    }, function (err) {
+        ok(false, "エラーコールバックは呼び出されない");
+    }).
+    done(function () {
+        QUnit.start();
+    });
+});
+
+asyncTest("Promise.join", 1, function () {
+    var values = [
+        Ten.Promise.wrap(100),
+        Ten.Promise.wrap(200),
+        300,
+        new Ten.Promise(function (c) { setTimeout(function () { c(400) }, 4) })
+    ];
+    Ten.Promise.join(values).
+    then(function (v) {
+        deepEqual(v, [100,200,300,400]);
+    }, function (err) {
+        ok(false, "エラーコールバックは呼び出されない");
+    }).
+    done(function () {
+        QUnit.start();
+    });
+});
+
+asyncTest("Promise.join - with error", 1, function () {
+    var values = [
+        Ten.Promise.wrapError("error!?"),
+        Ten.Promise.wrap(200),
+        300,
+        new Ten.Promise(function (c,e) { setTimeout(function () { e("bad news") }, 4) })
+    ];
+    Ten.Promise.join(values).
+    then(null, function (err) {
+        deepEqual(err, {0: "error!?", 3: "bad news"});
+    }).
+    done(function () {
+        QUnit.start();
+    });
+});
+
+asyncTest("Promise.join - with cancel", 1, function () {
+    var values = [
+        Ten.Promise.wrap(100),
+        Ten.Promise.wrap(200),
+        300,
+        new Ten.Promise(function (c,e) { setTimeout(function () { e("bad news") }, 4) })
+    ];
+    var p = Ten.Promise.join(values).
+    then(null, function (err) {
+        console.dir(err);
+        equal(err.name, "Canceled");
+    });
+    p.done(function () {
+        QUnit.start();
+    });
+    p.cancel();
+});
+
+

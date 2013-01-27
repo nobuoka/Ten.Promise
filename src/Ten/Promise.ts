@@ -2,9 +2,11 @@ module Ten {
     "use strict";
 
     var CANCELED_NAME = "Canceled";
-    var CANCELED_DESC = "Canceled";
+    var CANCELED_MSG = "Canceled";
     function createCancelEvent() {
-        return { name: CANCELED_NAME, description: CANCELED_DESC };
+        var e = new Error(CANCELED_MSG);
+        e.name = CANCELED_NAME;
+        return e;
     }
 
     interface PromiseListener {
@@ -207,17 +209,15 @@ module Ten {
                 }
             );
         }
+        // similer to WinJS.Promise.join, but has some differences
         static join(values) {
             var numErrors = 0;
             var numCanceled = 0;
             var errors = {};
             var fulfilleds = {};
             var p = Promise.waitAll(values).then(function (values) {
-                if (numErrors === 0) {
-                    // all success
-                    for (var name in fulfilleds) {
-                        values[name] = fulfilleds[name];
-                    }
+                if (numErrors === 0) { // all success
+                    for (var name in fulfilleds) values[name] = fulfilleds[name];
                     return values;
                 } else if (numErrors - numCanceled === 0) {
                     // no error (except canceled) and al least one canceled
@@ -226,13 +226,17 @@ module Ten {
                     // at least one error (except canceled)
                     throw errors;
                 }
-            }, null, function (dat) {
-                if (dat.isError) {
+            }, function (err) {
+                var e = new Error("unexpected error: see `detail` property of this object");
+                e["detail"] = err;
+                throw e;
+            }, function (dat) {
+                if (!dat.isError) {
                     fulfilleds[dat.key] = dat.value;
                 } else {
                     numErrors++;
-                    if (dat.value && dat.value.name === CANCELED_NAME) numCanceled++;
-                    errors[dat.key] = dat.value;
+                    if (dat.error && dat.error.name === CANCELED_NAME) numCanceled++;
+                    errors[dat.key] = dat.error;
                 }
             });
             var origCancel = p.cancel;
@@ -242,6 +246,7 @@ module Ten {
                     if (Promise.is(v)) v.cancel();
                 }
             };
+            return p;
         }
     }
 }
@@ -276,6 +281,8 @@ declare var MessageChannel;
         };
     } else {
         // fallback (it can't pass test...)
-        Ten.Promise.callInCaseAlreadyCompleted = function (c) { c() };
+        Ten.Promise.callInCaseAlreadyCompleted = function (c) {
+            throw new Error("Ten.Promise.callInCaseAlreadyCompleted method not implemented");
+        };
     }
 }).call(this);
