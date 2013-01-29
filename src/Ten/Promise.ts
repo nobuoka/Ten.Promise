@@ -1,0 +1,125 @@
+
+module Ten {
+    "use strict";
+
+    export interface IPromise {
+        then(s,e): IPromise;
+    }
+
+    interface IPromiseCallback {
+        prom: IPromise;
+        s: (val: any) => any;
+        e: (val: any) => any;
+    };
+
+    export class BasePromise implements IPromise {
+        static _STAT_EMPTY  = 1;
+        static _STAT_WAIT   = 2;
+        static _STAT_FULFIL = 4;
+        static _STAT_ERROR  = 8;
+        // bits mask for empty state or waiting state
+        static _BITS_UNFULFILLED_STAT = 3; // === (1 | 2)
+
+        private __stat: number;
+        private __callbacks: IPromiseCallback[];
+        private __val: any;
+        private __callbackTypeName: string;
+
+        constructor() {
+            this.__stat = BasePromise._STAT_EMPTY;
+            this.__callbacks = [];
+        }
+
+        then(s,e): IPromise {
+            // create callback obj
+            var prom = new BasePromise();
+            var callbackObj = {
+                s: s,
+                e: e,
+                prom: prom,
+            };
+            if (this.__isUnfulfilled()) {
+                this.__callbacks.push(callbackObj);
+            } else {
+                // TODO implements without setTimeout
+                var that = this;
+                setTimeout(function () { that.__handleCallback(callbackObj) }, 4);
+            }
+            return prom;
+        }
+
+        private __callbackAll() {
+            var cc = this.__callbacks.reverse();
+            while (cc.length > 0) {
+                var c = cc.pop();
+                this.__handleCallback(c);
+            }
+        }
+        private __handleCallback(callbackObj: IPromiseCallback) {
+            var retVal;
+            var errOccur = false;
+            try {
+                var c = callbackObj[this.__callbackTypeName];
+                if (typeof c !== "function") {
+                    retVal = this.__val;
+                    errOccur = (this.__stat === BasePromise._STAT_ERROR);
+                } else {
+                    retVal = c.call(null, this.__val);
+                }
+            } catch (err) {
+                errOccur = true;
+                retVal = err;
+            }
+            var p;
+            if (p = callbackObj.prom) {
+                errOccur ? p._putError(retVal) : p._putValOrProm(retVal);
+            }
+        }
+
+        private __isUnfulfilled() { // true when empty state or waiting state
+            return ((this.__stat & BasePromise._BITS_UNFULFILLED_STAT) !== 0);
+        }
+
+        private __setValue(val) {
+            this.__stat = BasePromise._STAT_FULFIL;
+            this.__val = val;
+            this.__callbackTypeName = "s";
+            this.__callbackAll();
+        }
+
+        private __setError(err) {
+            this.__stat = BasePromise._STAT_ERROR;
+            this.__val = err;
+            this.__callbackTypeName = "e";
+            this.__callbackAll();
+        }
+
+        private __waitFor(prom) {
+            this.__stat = BasePromise._STAT_WAIT;
+            this.__val = prom;
+            var that = this;
+            prom.then(
+                function onSuccess(val) { that.__setValue(val) },
+                function onError(err) { that.__setError(err) });
+        }
+
+        _putValOrProm(v) {
+            if (this.__stat !== BasePromise._STAT_EMPTY) return;
+            BasePromise.is(v) ? this.__waitFor(v) : this.__setValue(v);
+        }
+
+        _putValue(v) {
+            if (this.__stat !== BasePromise._STAT_EMPTY) return;
+            this.__setValue(v);
+        }
+
+        _putError(e) {
+            if (this.__stat !== BasePromise._STAT_EMPTY) return;
+            this.__setError(e);
+        }
+
+        static is(v) {
+            return !!(v && typeof v.then === "function");
+        }
+    }
+}
