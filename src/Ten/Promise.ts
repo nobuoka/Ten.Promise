@@ -6,6 +6,10 @@ module Ten {
         then(s,e): IPromise;
     }
 
+    function isPromise(v) {
+        return !!(v && typeof v.then === "function");
+    }
+
     interface IPromiseCallback {
         prom: IPromise;
         s: (val: any) => any;
@@ -134,7 +138,7 @@ module Ten {
             this.__callbackAll();
         }
 
-        private __waitFor(prom) {
+        private __waitFor(prom: IPromise) {
             this.__stat = BasePromise._STAT_WAIT;
             this.__val = prom;
             var that = this;
@@ -145,7 +149,7 @@ module Ten {
 
         _putValOrProm(v) {
             if (this.__stat !== BasePromise._STAT_EMPTY) return;
-            BasePromise.is(v) ? this.__waitFor(v) : this.__setValue(v);
+            isPromise(v) ? this.__waitFor(<IPromise>v) : this.__setValue(v);
         }
 
         _putValue(v) {
@@ -156,10 +160,6 @@ module Ten {
         _putError(e) {
             if (this.__stat !== BasePromise._STAT_EMPTY) return;
             this.__setError(e);
-        }
-
-        static is(v) {
-            return !!(v && typeof v.then === "function");
         }
     }
 }
