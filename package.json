@@ -1,0 +1,11 @@
+{ "name": "ten-promise"
+, "version": "0.0.1"
+, "scripts": {
+    "test": "jake test:all"
+  }
+, "devDependencies": {
+    "typescript": "*",
+    "jake": "*",
+    "promises-aplus-tests": "*"
+  }
+}
