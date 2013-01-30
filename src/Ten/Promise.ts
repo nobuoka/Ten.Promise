@@ -12,6 +12,47 @@ module Ten {
         e: (val: any) => any;
     };
 
+    declare var process;
+    declare var setImmediate;
+    declare var setTimeout;
+    declare var MessageChannel;
+    interface ITaskFunction {
+        (): void;
+    }
+    var queueTaskToEventLoop: {(task: ITaskFunction): void;};
+    (function () {
+        if (typeof process === "object" && typeof process.nextTick === "function") {
+            // for Node
+            queueTaskToEventLoop = function (t: ITaskFunction) { process.nextTick(t) };
+        } else if (typeof setImmediate === "function") {
+            queueTaskToEventLoop = function (t: ITaskFunction) { setImmediate(t) };
+        } else if (typeof MessageChannel === "function") {
+            queueTaskToEventLoop = function (t: ITaskFunction) {
+                var ch = new MessageChannel();
+                ch.port1.onmessage = function() {
+                    ch.port1.onmessage = null; ch = null;
+                    t();
+                };
+                ch.port2.postMessage(0);
+            };
+        } else if (typeof window === "object" && typeof window.postMessage === "function"
+                   && typeof window.addEventListener === "function") {
+            queueTaskToEventLoop = function (t: ITaskFunction) {
+                window.addEventListener("message", function onMessage(evt) {
+                    window.removeEventListener("message", onMessage, false);
+                    t();
+                }, false);
+                window.postMessage("triger of function call", "*");
+            };
+        } else if (typeof setTimeout === "function") {
+            queueTaskToEventLoop = function (t: ITaskFunction) { setTimeout(t, 0) };
+        } else {
+            queueTaskToEventLoop = function (t: ITaskFunction) {
+                throw new Error("queueTaskToEventLoop method not implemented");
+            };
+        }
+    })();
+
     export class BasePromise implements IPromise {
         static _STAT_EMPTY  = 1;
         static _STAT_WAIT   = 2;
@@ -41,9 +82,8 @@ module Ten {
             if (this.__isUnfulfilled()) {
                 this.__callbacks.push(callbackObj);
             } else {
-                // TODO implements without setTimeout
                 var that = this;
-                setTimeout(function () { that.__handleCallback(callbackObj) }, 4);
+                queueTaskToEventLoop(function () { that.__handleCallback(callbackObj) });
             }
             return prom;
         }
