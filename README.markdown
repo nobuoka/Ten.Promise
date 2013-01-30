@@ -23,13 +23,13 @@ Jake, the build tool for Node.js is used.
 To build, execute:
 
 ````
-$ jake -B
+$ jake
 ````
 
 To run test for Promises/A+:
 
 ````
-$ jake -B test:promises_aplus
+$ jake test:promises_aplus
 ````
 
 ### Options
@@ -37,7 +37,7 @@ $ jake -B test:promises_aplus
 You can pass several environment variables to let jake use another command name as follows.
 
 ````
-$ jake TSC="node ../typescript/bin/tsc" -B test:promises_aplus
+$ jake TSC="node ../typescript/bin/tsc" test:promises_aplus
 ```
 
 In this example, jake use `node ../typescript/bin/tsc` command instead of `tsc` command.
