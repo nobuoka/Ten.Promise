@@ -14,6 +14,7 @@ To build Ten.Promise, following tools are needed:
 If you run tests, following commands are needed:
 
 * CommonJS Promises/A+ tests: [promises-aplus-tests](https://npmjs.org/package/promises-aplus-tests)
+* Mocha: [mocha](http://visionmedia.github.com/mocha/)
 
 Build and Test
 ------------------------------
@@ -26,10 +27,16 @@ To build, execute:
 $ jake
 ````
 
-To run test for Promises/A+:
+To run all tests available on command line interface:
 
 ````
-$ jake test:promises_aplus
+$ jake test:all
+````
+
+To see all tasks:
+
+````
+$ jake --tasks
 ````
 
 ### Options
@@ -37,7 +44,7 @@ $ jake test:promises_aplus
 You can pass several environment variables to let jake use another command name as follows.
 
 ````
-$ jake TSC="node ../typescript/bin/tsc" test:promises_aplus
+$ jake TSC="node ../typescript/bin/tsc"
 ```
 
 In this example, jake use `node ../typescript/bin/tsc` command instead of `tsc` command.
@@ -46,3 +53,4 @@ Here is list of environment variables which you can use.
 
 * TSC: command of TypeScript compiler (default value is `tsc`)
 * APLUS_TESTS: command of Promises/A+ tests (default value is `promises-apluts-tests`)
+* MOCHA: mocha command (default value is `mocha`)
