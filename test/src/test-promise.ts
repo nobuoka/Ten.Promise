@@ -32,10 +32,30 @@ t.testAsync("call success callback when initialized with success synchronously",
     }, dontCall);
 });
 
+t.testAsync("call success callback with raw value when initialized with promise-wrapped value", function (done) {
+    var pOrder = [];
+
+    new Promise(function (s, e) {
+        s(new Promise(function (s, e) {
+            s(10);
+        }));
+    }).then(function (val) {
+        t.strictEqual(val, 10);
+        pOrder.push(1);
+    });
+
+    new Promise(function (s, e) {
+        s("END");
+    }).then(function (val) {
+        t.deepEqual(pOrder, [1]);
+        done();
+    }, dontCall);
+});
+
 t.testAsync("call error callback when initialized with error synchronously", function (done) {
     var pOrder = [];
 
-    function initPromiseWithErrorSync(testId, testVal) {
+    function initPromiseWithErrorSync(testId, testVal, msg?: string) {
         new Promise(function (s,e) {
             e(testVal);
         }).then(dontCall, function onError(err) {
@@ -49,11 +69,13 @@ t.testAsync("call error callback when initialized with error synchronously", fun
     initPromiseWithErrorSync(3, "文字列");
     initPromiseWithErrorSync(4, void 0);
     initPromiseWithErrorSync(5, {});
+    initPromiseWithErrorSync(6, new Promise(function (s, e) { s(10) }),
+                "`Promise` object as error value");
 
     new Promise(function (s,e) {
         s("END");
     }).then(function (val) {
-        t.deepEqual(pOrder, [1,2,3,4,5]);
+        t.deepEqual(pOrder, [1,2,3,4,5,6]);
         done();
     }, dontCall);
 });
@@ -82,6 +104,26 @@ t.testAsync("call error callback in case exception is thrown in promise initiali
         s("END");
     }).then(function (val) {
         t.deepEqual(pOrder, [1,2]);
+        done();
+    }, dontCall);
+});
+
+// ---- test of timing ----
+
+t.testAsync("invoke promise initializing function immediately", function (done) {
+    var pOrder = [];
+
+    pOrder.push(1);
+    new Promise(function (s, e) {
+        pOrder.push(2);
+        s(null);
+    });
+    pOrder.push(3);
+
+    new Promise(function (s, e) {
+        s("END");
+    }).then(function (val) {
+        t.deepEqual(pOrder, [1, 2, 3]);
         done();
     }, dontCall);
 });
