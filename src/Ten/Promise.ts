@@ -162,4 +162,17 @@ module Ten {
             this.__setError(e);
         }
     }
+
+    interface IPromiseInit {
+        (s: (val) => void, e: (val) => void): void;
+    }
+    export class Promise extends BasePromise {
+        constructor(init: IPromiseInit) {
+            super();
+            var that = this;
+            var s = function (v) { that._putValOrProm(v) };
+            var e = function (v) { that._putError(v) };
+            init(s,e);
+        }
+    }
 }

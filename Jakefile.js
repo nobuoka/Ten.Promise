@@ -90,6 +90,7 @@ var SRC_TEST = {
     ADAPT_QUNIT: "test/src/adapter-qunit.ts",
     TESTS: [
         "test/src/test-promise-base.ts",
+        "test/src/test-promise.ts",
     ]
 };
 
