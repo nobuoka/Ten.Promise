@@ -58,4 +58,32 @@ t.testAsync("call error callback when initialized with error synchronously", fun
     }, dontCall);
 });
 
+t.testAsync("call error callback in case exception is thrown in promise initializing function", function (done) {
+    var pOrder = [];
+
+    new Promise(function (s, e) {
+        throw "error in promise initializer";
+    }).then(dontCall, function onError(err) {
+        t.strictEqual(err, "error in promise initializer",
+            "error callback receives a value thrown in promise initializing function");
+        pOrder.push(1);
+    });
+
+    var p = new Promise(function (s, e) { s(10) });
+    new Promise(function (s, e) {
+        throw p;
+    }).then(dontCall, function onError(err) {
+        t.strictEqual(err, p,
+            "error callback receives a value thrown in promise initializing function (even if it is `Promise` object)");
+        pOrder.push(2);
+    });
+
+    new Promise(function (s, e) {
+        s("END");
+    }).then(function (val) {
+        t.deepEqual(pOrder, [1,2]);
+        done();
+    }, dontCall);
+});
+
 }).call(this);

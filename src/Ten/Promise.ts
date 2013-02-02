@@ -172,7 +172,11 @@ module Ten {
             var that = this;
             var s = function (v) { that._putValOrProm(v) };
             var e = function (v) { that._putError(v) };
-            init(s,e);
+            try {
+                init(s,e);
+            } catch (err) {
+                e(err);
+            }
         }
     }
 }
