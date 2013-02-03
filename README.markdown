@@ -54,3 +54,8 @@ Here is list of environment variables which you can use.
 * TSC: command of TypeScript compiler (default value is `tsc`)
 * APLUS_TESTS: command of Promises/A+ tests (default value is `promises-apluts-tests`)
 * MOCHA: mocha command (default value is `mocha`)
+
+License
+------------------------------
+
+This software is published under The MIT License.
