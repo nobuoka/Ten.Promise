@@ -110,7 +110,7 @@ module Ten {
             if (cancelTargetProm && typeof cancelTargetProm.cancel === "function") {
                 cancelTargetProm.cancel();
             }
-            this._putError(createCancelError());
+            if (this.__stat !== BasePromise._STAT_WAIT) this._putError(createCancelError());
         }
 
         private __callbackAll() {
