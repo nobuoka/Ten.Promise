@@ -32,9 +32,9 @@ namespace("test", function () {
 
 namespace("build", function () {
   desc("build Ten.Promise.js");
-  task("normal", ["js/Ten.Promise.js"]);
+  task("normal", ["built/Ten.Promise.js"]);
   desc("build Ten.Promise.for_node.js");
-  task("for_node", ["js/Ten.Promise.for_node.js"]);
+  task("for_node", ["built/Ten.Promise.for_node.js"]);
 
   desc("build js for internal tests with mocha");
   task("test_with_mocha", ["test/with_mocha/tests.js"]);
@@ -43,7 +43,7 @@ namespace("build", function () {
   task("test_with_qunit", ["build:normal", "test/with_qunit/tests.js"]);
 });
 
-directory("js");
+directory("built");
 
 function _execCompileCmd(cmd, successMsg) {
     jake.exec(cmd, function () {
@@ -59,8 +59,8 @@ var SRC = {
 
 // Ten.Promise.js
 (function () {
-var targetFilePath = "js/Ten.Promise.js";
-file(targetFilePath, ["js", SRC.MAIN], function () {
+var targetFilePath = "built/Ten.Promise.js";
+file(targetFilePath, ["built", SRC.MAIN], function () {
     var cmd =
         [ CMD.TSC,
           SRC.MAIN,
@@ -72,8 +72,8 @@ file(targetFilePath, ["js", SRC.MAIN], function () {
 
 // Ten.Promise.js for Node
 (function () {
-var targetFilePath = "js/Ten.Promise.for_node.js";
-file(targetFilePath, ["js", SRC.MAIN, SRC.F_NODE], function () {
+var targetFilePath = "built/Ten.Promise.for_node.js";
+file(targetFilePath, ["built", SRC.MAIN, SRC.F_NODE], function () {
     var cmd =
         [ CMD.TSC,
           SRC.MAIN, SRC.F_NODE,

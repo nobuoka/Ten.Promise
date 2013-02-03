@@ -22,4 +22,4 @@ t = {
 };
 }).call(this);
 
-var Ten = require("../../js/Ten.Promise.for_node.js").Ten;
+var Ten = require("../../built/Ten.Promise.for_node.js");

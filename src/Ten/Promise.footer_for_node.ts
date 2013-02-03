@@ -1,2 +1,3 @@
 declare var exports;
-exports.Ten = Ten;
+exports.Promise = Ten.Promise;
+exports.BasePromise = Ten.BasePromise;
