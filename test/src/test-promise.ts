@@ -404,6 +404,58 @@ t.testAsync("If error is thrown from `onCancel` function while processing cancel
     }, dontCall);
 });
 
+t.testAsync("If promise is fulfilled during cancellation process, fulfilled value is valid", function (done) {
+    var pOrder = [];
+
+    var initWithSuccess;
+    var p = new Promise(function (s,e) {
+        initWithSuccess = s;
+    }, function onCancel() {
+        initWithSuccess(300);
+    });
+
+    p.cancel();
+
+    p.then(function (val) {
+        pOrder.push(1);
+        t.strictEqual(val, 300);
+        pOrder.push(2);
+    });
+
+    new Promise(function (s,e) {
+        s("END");
+    }).then(function (val) {
+        t.deepEqual(pOrder, [1,2]);
+        done();
+    }, dontCall);
+});
+
+t.testAsync("If promise receive error during cancellation process, error value is valid", function (done) {
+    var pOrder = [];
+
+    var initWithError;
+    var p = new Promise(function (s,e) {
+        initWithError = e;
+    }, function onCancel() {
+        initWithError(400);
+    });
+
+    p.cancel();
+
+    p.then(null, function onError(err) {
+        pOrder.push(1);
+        t.strictEqual(err, 400);
+        pOrder.push(2);
+    });
+
+    new Promise(function (s,e) {
+        s("END");
+    }).then(function (val) {
+        t.deepEqual(pOrder, [1,2]);
+        done();
+    }, dontCall);
+});
+
 // ---- test of timing ----
 
 t.testAsync("invoke promise initializing function immediately", function (done) {
