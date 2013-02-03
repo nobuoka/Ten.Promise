@@ -373,6 +373,37 @@ t.testAsync("cancel only last internal promise if waiting multiple promises inte
     }, dontCall);
 });
 
+t.testAsync("If error is thrown from `onCancel` function while processing cancellation, the error is caught and is stopped there", function (done) {
+    var pOrder = [];
+
+    var p = new Promise(function (s,e) {
+    }, function onCancel() {
+        throw "error in `onCancel`";
+    });
+
+    // p is fulfilled
+    pOrder.push(1);
+    p.cancel();
+    pOrder.push(2);
+
+    p.then(function (val) {
+        pOrder.push("err"); // must not be here
+    }, function onError(err) {
+        pOrder.push(3);
+        t.ok(typeof err === "object");
+        t.strictEqual(err.name, "Canceled",
+                "value of `name` property of thrown `Error` object when cancelled is \"Canceled\"");
+        pOrder.push(4);
+    });
+
+    new Promise(function (s,e) {
+        s("END");
+    }).then(function (val) {
+        t.deepEqual(pOrder, [1,2,3,4]);
+        done();
+    }, dontCall);
+});
+
 // ---- test of timing ----
 
 t.testAsync("invoke promise initializing function immediately", function (done) {

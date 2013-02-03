@@ -189,7 +189,7 @@ module Ten {
     }
     export class Promise extends BasePromise {
         private __onCancel;
-        constructor(init: IPromiseInit, onCancel?) {
+        constructor(init: IPromiseInit, onCancel?: ITaskFunction) {
             super();
             this.__onCancel = onCancel;
             var that = this;
@@ -202,7 +202,11 @@ module Ten {
             }
         }
         cancel() {
-            if (typeof this.__onCancel === "function") this.__onCancel();
+            if (typeof this.__onCancel === "function") {
+                try {
+                    this.__onCancel();
+                } catch (err) {} // catch and stop here
+            }
             super.cancel();
         }
     }
