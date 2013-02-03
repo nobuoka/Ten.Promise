@@ -285,6 +285,94 @@ t.testAsync("Promise which waits for another promise internally can wait for ano
     }, dontCall);
 });
 
+// ---- tests of cancellation ----
+
+t.testAsync("be able to be cancelled if it is unfulfilled", function (done) {
+    var pOrder = [];
+
+    var p = new Promise(function (s,e) { });
+
+    p.then(function () {
+        pOrder.push("err"); // must not be here
+    }, function onError(err) {
+        pOrder.push(2);
+        t.ok(typeof err === "object");
+        t.strictEqual(err.name, "Canceled",
+                "value of `name` property of thrown `Error` object when cancelled is \"Canceled\"");
+        pOrder.push(3);
+    });
+    // p is unfulfilled
+    pOrder.push(1);
+    p.cancel();
+    pOrder.push(4);
+
+    new Promise(function (s,e) {
+        s("END");
+    }).then(function (val) {
+        t.deepEqual(pOrder, [1,2,3,4]);
+        done();
+    }, dontCall);
+});
+
+t.testAsync("be not able to be cancelled if it is not unfulfilled", function (done) {
+    var pOrder = [];
+
+    var initWithSuccess;
+    var p = new Promise(function (s,e) {
+        initWithSuccess = s;
+    });
+    initWithSuccess(100);
+
+    // p is fulfilled
+    pOrder.push(1);
+    p.cancel();
+    pOrder.push(2);
+
+    p.then(function (val) {
+        pOrder.push(3);
+        t.strictEqual(val, 100);
+        pOrder.push(4);
+    }, function onError(err) {
+        pOrder.push("err"); // must not be here
+    });
+
+    new Promise(function (s,e) {
+        s("END");
+    }).then(function (val) {
+        t.deepEqual(pOrder, [1,2,3,4]);
+        done();
+    }, dontCall);
+});
+
+t.testAsync("cancel only last internal promise if waiting multiple promises internally", function (done) {
+    var pOrder = [];
+
+    var initWithSuccess;
+    var p = new Promise(function (s,e) {
+        initWithSuccess = s;
+    });
+
+    // wait for multiple promises
+    initWithSuccess(new Promise(function () { }, function onCancel() {
+        pOrder.push(1);
+    }));
+    initWithSuccess(new Promise(function () { }, function onCancel() {
+        pOrder.push(2);
+    }));
+    initWithSuccess(new Promise(function () { }, function onCancel() {
+        pOrder.push(3);
+    }));
+
+    p.cancel();
+
+    new Promise(function (s,e) {
+        s("END");
+    }).then(function (val) {
+        t.deepEqual(pOrder, [3], "only one internal promise is cancelled");
+        done();
+    }, dontCall);
+});
+
 // ---- test of timing ----
 
 t.testAsync("invoke promise initializing function immediately", function (done) {

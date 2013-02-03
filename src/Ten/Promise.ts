@@ -10,6 +10,12 @@ module Ten {
         return !!(v && typeof v.then === "function");
     }
 
+    function createCancelError() {
+        var err = new Error("Canceled");
+        err.name = "Canceled";
+        return err;
+    }
+
     interface IPromiseCallback {
         prom: IPromise;
         s: (val: any) => any;
@@ -69,6 +75,7 @@ module Ten {
         private __callbacks: IPromiseCallback[];
         private __val: any;
         private __callbackTypeName: string;
+        private __parentPromise: BasePromise;
 
         constructor() {
             this.__stat = BasePromise._STAT_EMPTY;
@@ -78,6 +85,7 @@ module Ten {
         then(s,e): IPromise {
             // create callback obj
             var prom = new BasePromise();
+            prom.__parentPromise = this;
             var callbackObj = {
                 s: s,
                 e: e,
@@ -90,6 +98,19 @@ module Ten {
                 queueTaskToEventLoop(function () { that.__handleCallback(callbackObj) });
             }
             return prom;
+        }
+
+        cancel() {
+            var cancelTargetProm;
+            if (this.__stat === BasePromise._STAT_EMPTY) {
+                var cancelTargetProm = this.__parentPromise;
+            } else if(this.__stat === BasePromise._STAT_WAIT) {
+                var cancelTargetProm = this.__val;
+            }
+            if (cancelTargetProm && typeof cancelTargetProm.cancel === "function") {
+                cancelTargetProm.cancel();
+            }
+            this._putError(createCancelError());
         }
 
         private __callbackAll() {
@@ -167,8 +188,10 @@ module Ten {
         (s: (val) => void, e: (val) => void): void;
     }
     export class Promise extends BasePromise {
-        constructor(init: IPromiseInit) {
+        private __onCancel;
+        constructor(init: IPromiseInit, onCancel?) {
             super();
+            this.__onCancel = onCancel;
             var that = this;
             var s = function (v) { that._putValOrProm(v) };
             var e = function (v) { that._putError(v) };
@@ -177,6 +200,10 @@ module Ten {
             } catch (err) {
                 e(err);
             }
+        }
+        cancel() {
+            if (typeof this.__onCancel === "function") this.__onCancel();
+            super.cancel();
         }
     }
 }
