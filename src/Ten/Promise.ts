@@ -125,7 +125,7 @@ module Ten {
         }
         private __handleCallbacks(callbackObjs: IPromiseCallback[]) {
             var retVals: IPromiseCallbackReturn[] = [];
-            var cc = callbackObjs.reverse(); // reverse and COPY!
+            var cc = callbackObjs.slice(0).reverse();
             while (cc.length > 0) {
                 var c = cc.pop();
                 var v = this.__callCallbackFunction(c);
@@ -159,7 +159,7 @@ module Ten {
         }
 
         private __callProgressCallbacks(val) {
-            var cc = this.__callbacks.reverse(); // reverse and COPY!
+            var cc = this.__callbacks.slice(0).reverse();
             while (cc.length > 0) {
                 var c = cc.pop();
                 var progressCallbackFunction = c.p;

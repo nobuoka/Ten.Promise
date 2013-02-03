@@ -636,4 +636,72 @@ t.testAsync("call callback function immediately promise is initialized (with err
     }, dontCall);
 });
 
+// ---- tests of progress callback ----
+
+t.testAsync("call progress callback when `p` function is called", function (done) {
+    var pOrder = [];
+
+    var progressFunction;
+    var p = new Promise(function (s,e,p) {
+        progressFunction = p;
+    });
+
+    // there is no callback function
+    progressFunction(1);
+
+    // one callback functions
+    p.then(null,null,function onProgress(val) {
+        pOrder.push("p1:" + val);
+    });
+    progressFunction(2);
+
+    // multiple callback functions
+    p.then(null,null,function onProgress(val) {
+        pOrder.push("p2:" + val);
+    });
+    progressFunction(3);
+
+    new Promise(function (s,e) {
+        s("END");
+    }).then(function (val) {
+        t.deepEqual(pOrder, ["p1:2","p1:3","p2:3"]);
+        done();
+    }, dontCall);
+});
+
+t.testAsync("If promise is not unfulfilled, promise don't call progress callback", function (done) {
+    var pOrder = [];
+
+    var initWithSuccess;
+    var progressFunction;
+    var p = new Promise(function (s,e,p) {
+        initWithSuccess = s;
+        progressFunction = p;
+    });
+
+    initWithSuccess(20);
+
+    // there is no callback function
+    progressFunction(1);
+
+    // one callback functions
+    p.then(null,null,function onProgress(val) {
+        pOrder.push("p1:" + val); // must not be here
+    });
+    progressFunction(2);
+
+    // multiple callback functions
+    p.then(null,null,function onProgress(val) {
+        pOrder.push("p2:" + val); // must not be here
+    });
+    progressFunction(3);
+
+    new Promise(function (s,e) {
+        s("END");
+    }).then(function (val) {
+        t.deepEqual(pOrder, []);
+        done();
+    }, dontCall);
+});
+
 }).call(this);
