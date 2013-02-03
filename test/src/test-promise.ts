@@ -108,6 +108,36 @@ t.testAsync("call error callback in case exception is thrown in promise initiali
     }, dontCall);
 });
 
+t.testAsync("If promise has multiple callback functions, the promise call all callback functions before fulfill child promises", function (done) {
+    var pOrder = [];
+
+    var initWithSuccess;
+    var p = new Promise(function (s, e) {
+        initWithSuccess = s;
+    });
+
+    var p1 = p.then(function (val) { pOrder.push(1) });
+    var p2 = p.then(function (val) { pOrder.push(2) });
+    var p3 = p.then(function (val) { pOrder.push(3) });
+
+    var p1_1 = p1.then(function (val) { pOrder.push(7) });
+    var p1_2 = p1.then(function (val) { pOrder.push(8) });
+    var p2_1 = p2.then(function (val) { pOrder.push(6) });
+    var p3_1 = p3.then(function (val) { pOrder.push(4) });
+
+    var p1_1_1 = p1_1.then(function (val) { pOrder.push(9) });
+    var p3_1_1 = p3_1.then(function (val) { pOrder.push(5) });
+
+    initWithSuccess(100);
+
+    new Promise(function (s, e) {
+        s("END");
+    }).then(function (val) {
+        t.deepEqual(pOrder, [1,2,3,4,5,6,7,8,9]);
+        done();
+    }, dontCall);
+});
+
 // ---- tests of restriction on initializing ----
 
 t.testAsync("Promise which value has been already set on cannot receive another value", function (done) {

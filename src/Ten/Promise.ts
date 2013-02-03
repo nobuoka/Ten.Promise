@@ -21,6 +21,11 @@ module Ten {
         s: (val: any) => any;
         e: (val: any) => any;
     };
+    interface IPromiseCallbackReturn {
+        errorOccur: bool;
+        value: any;
+        prom: BasePromise;
+    };
 
     declare var process;
     declare var setImmediate;
@@ -86,7 +91,7 @@ module Ten {
             // create callback obj
             var prom = new BasePromise();
             prom.__parentPromise = this;
-            var callbackObj = {
+            var callbackObj: IPromiseCallback = {
                 s: s,
                 e: e,
                 prom: prom,
@@ -95,7 +100,7 @@ module Ten {
                 this.__callbacks.push(callbackObj);
             } else {
                 var that = this;
-                queueTaskToEventLoop(function () { that.__handleCallback(callbackObj) });
+                queueTaskToEventLoop(function () { that.__handleCallbacks([callbackObj]) });
             }
             return prom;
         }
@@ -114,13 +119,26 @@ module Ten {
         }
 
         private __callbackAll() {
-            var cc = this.__callbacks.reverse();
+            this.__handleCallbacks(this.__callbacks);
+        }
+        private __handleCallbacks(callbackObjs: IPromiseCallback[]) {
+            var retVals: IPromiseCallbackReturn[] = [];
+            var cc = callbackObjs.reverse();
             while (cc.length > 0) {
                 var c = cc.pop();
-                this.__handleCallback(c);
+                var v = this.__callCallbackFunction(c);
+                var p;
+                if (p = c.prom) {
+                    v.prom = p;
+                    retVals.push(v);
+                }
+            }
+            while (retVals.length > 0) {
+                var v = retVals.pop();
+                v.errorOccur ? v.prom._putError(v.value) : v.prom._putValOrProm(v.value);
             }
         }
-        private __handleCallback(callbackObj: IPromiseCallback) {
+        private __callCallbackFunction(callbackObj: IPromiseCallback): IPromiseCallbackReturn {
             var retVal;
             var errOccur = false;
             try {
@@ -135,10 +153,7 @@ module Ten {
                 errOccur = true;
                 retVal = err;
             }
-            var p;
-            if (p = callbackObj.prom) {
-                errOccur ? p._putError(retVal) : p._putValOrProm(retVal);
-            }
+            return { errorOccur: errOccur, value: retVal, prom: void 0 };
         }
 
         private __isUnfulfilled() { // true when empty state or waiting state
