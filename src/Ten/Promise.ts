@@ -143,22 +143,22 @@ module Ten {
             this.__val = prom;
             var that = this;
             prom.then(
-                function onSuccess(val) { that.__setValue(val) },
-                function onError(err) { that.__setError(err) });
+                function onSuccess(val) { that._putValue(val) },
+                function onError(err) { that._putError(err) });
         }
 
         _putValOrProm(v) {
-            if (this.__stat !== BasePromise._STAT_EMPTY) return;
+            if (!this.__isUnfulfilled()) return;
             isPromise(v) ? this.__waitFor(<IPromise>v) : this.__setValue(v);
         }
 
         _putValue(v) {
-            if (this.__stat !== BasePromise._STAT_EMPTY) return;
+            if (!this.__isUnfulfilled()) return;
             this.__setValue(v);
         }
 
         _putError(e) {
-            if (this.__stat !== BasePromise._STAT_EMPTY) return;
+            if (!this.__isUnfulfilled()) return;
             this.__setError(e);
         }
     }

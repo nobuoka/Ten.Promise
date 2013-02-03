@@ -108,6 +108,183 @@ t.testAsync("call error callback in case exception is thrown in promise initiali
     }, dontCall);
 });
 
+// ---- tests of restriction on initializing ----
+
+t.testAsync("Promise which value has been already set on cannot receive another value", function (done) {
+    var pOrder = [];
+
+    var initWithSuccess;
+    var initWithError;
+    var p = new Promise(function (s,e) {
+        initWithSuccess = s;
+        initWithError = e;
+    });
+
+    p.then(function (val) {
+        t.strictEqual(val, 100);
+        pOrder.push(1);
+    }, function onError(err) {
+        pOrder.push("err");
+        t.ok(false, "must not be here");
+    });
+    initWithSuccess(100);
+    // p has been already fulfilled
+    initWithSuccess(200); // this must not affect
+    initWithError("bad"); // this must not affect
+    p.then(function (val) {
+        t.strictEqual(val, 100);
+        pOrder.push(2);
+    }, function onError(err) {
+        pOrder.push("err");
+        t.ok(false, "must not be here");
+    });
+
+    new Promise(function (s,e) {
+        s("END");
+    }).then(function (val) {
+        t.deepEqual(pOrder, [1,2]);
+        done();
+    }, dontCall);
+});
+
+t.testAsync("Promise which error value has been already set on cannot receive another value", function (done) {
+    var pOrder = [];
+
+    var initWithSuccess;
+    var initWithError;
+    var p = new Promise(function (s,e) {
+        initWithSuccess = s;
+        initWithError = e;
+    });
+
+    p.then(function (val) {
+        pOrder.push("err");
+        t.ok(false, "must not be here");
+    }, function onError(err) {
+        t.strictEqual(err, 100);
+        pOrder.push(1);
+    });
+    initWithError(100);
+    // p has been already fulfilled (with error)
+    initWithSuccess(200); // this must not affect
+    initWithError("bad"); // this must not affect
+    p.then(function (val) {
+        pOrder.push("err");
+        t.ok(false, "must not be here");
+    }, function onError(err) {
+        t.strictEqual(err, 100);
+        pOrder.push(2);
+    });
+
+    new Promise(function (s,e) {
+        s("END");
+    }).then(function (val) {
+        t.deepEqual(pOrder, [1,2]);
+        done();
+    }, dontCall);
+});
+
+// I don't this this is the best specification, but WinJS.Promise is implemented as pass this test
+t.testAsync("Promise which waits for another promise internally can receive another value", function (done) {
+    var pOrder = [];
+
+    var initWithSuccess;
+    var initWithError;
+    var p = new Promise(function (s,e) {
+        initWithSuccess = s;
+        initWithError = e;
+    });
+
+    var initInternalPromise;
+    var internalProm = new Promise(function (s,e) {
+        initInternalPromise = s;
+    });
+    p.then(function (val) {
+        t.strictEqual(val, 200);
+        pOrder.push(1);
+    }, function onError(err) {
+        pOrder.push("err");
+        t.ok(false, "must not be here");
+    });
+    initWithSuccess(internalProm);
+    // p is waiting for internal promise
+    initWithSuccess(200);
+    initWithError("bad value"); // this must not affect
+    // fulfill internal promise
+    initInternalPromise("good value"); // this must not affect
+    p.then(function (val) {
+        t.strictEqual(val, 200);
+        pOrder.push(2);
+    }, function onError(err) {
+        pOrder.push("err");
+        t.ok(false, "must not be here");
+    });
+
+    new Promise(function (s,e) {
+        s("END");
+    }).then(function (val) {
+        t.deepEqual(pOrder, [1,2]);
+        done();
+    }, dontCall);
+});
+
+// I don't this this is the best specification, but WinJS.Promise is implemented as pass this test
+t.testAsync("Promise which waits for another promise internally can wait for another promise internally", function (done) {
+    var pOrder = [];
+
+    var initWithSuccess;
+    var initWithError;
+    var p = new Promise(function (s,e) {
+        initWithSuccess = s;
+        initWithError = e;
+    });
+
+    var initInternalPromise1;
+    var internalProm1 = new Promise(function (s,e) {
+        initInternalPromise1 = s;
+    });
+    var initInternalPromise2;
+    var internalProm2 = new Promise(function (s,e) {
+        initInternalPromise2 = s;
+    });
+    var initInternalPromise3;
+    var internalProm3 = new Promise(function (s,e) {
+        initInternalPromise3 = s;
+    });
+
+    p.then(function (val) {
+        pOrder.push(1);
+        t.strictEqual(val, "good value");
+        pOrder.push(2);
+    }, function onError(err) {
+        pOrder.push("err");
+        t.ok(false, "must not be here");
+    });
+    // wait for multiple promises internally
+    initWithSuccess(internalProm1);
+    initWithSuccess(internalProm2);
+    initWithSuccess(internalProm3);
+    // fulfill internal promises
+    initInternalPromise2("good value");
+    initInternalPromise3("another value"); // this must not affect
+    initInternalPromise1("another value"); // this must not affect
+    p.then(function (val) {
+        pOrder.push(3);
+        t.strictEqual(val, "good value");
+        pOrder.push(4);
+    }, function onError(err) {
+        pOrder.push("err");
+        t.ok(false, "must not be here");
+    });
+
+    new Promise(function (s,e) {
+        s("END");
+    }).then(function (val) {
+        t.deepEqual(pOrder, [1,2,3,4]);
+        done();
+    }, dontCall);
+});
+
 // ---- test of timing ----
 
 t.testAsync("invoke promise initializing function immediately", function (done) {
