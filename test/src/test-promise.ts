@@ -128,4 +128,52 @@ t.testAsync("invoke promise initializing function immediately", function (done) 
     }, dontCall);
 });
 
+t.testAsync("call callback function immediately promise is initialized", function (done) {
+    var pOrder = [];
+
+    pOrder.push(1);
+    var initWithSuccess;
+    var p = new Promise(function (s,e) {
+        pOrder.push(2);
+        initWithSuccess = s;
+    });
+    p.then(function () {
+        pOrder.push(4);
+    });
+    pOrder.push(3);
+    initWithSuccess("good");
+    pOrder.push(5);
+
+    new Promise(function (s,e) {
+        s("END");
+    }).then(function (val) {
+        t.deepEqual(pOrder, [1,2,3,4,5]);
+        done();
+    }, dontCall);
+});
+
+t.testAsync("call callback function immediately promise is initialized (with error)", function (done) {
+    var pOrder = [];
+
+    pOrder.push(1);
+    var initWithError;
+    var p = new Promise(function (s,e) {
+        pOrder.push(2);
+        initWithError = e;
+    });
+    p.then(null, function onError() {
+        pOrder.push(4);
+    });
+    pOrder.push(3);
+    initWithError("error");
+    pOrder.push(5);
+
+    new Promise(function (s,e) {
+        s("END");
+    }).then(function (val) {
+        t.deepEqual(pOrder, [1,2,3,4,5]);
+        done();
+    }, dontCall);
+});
+
 }).call(this);
