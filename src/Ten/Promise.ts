@@ -3,7 +3,7 @@ module Ten {
     "use strict";
 
     export interface IPromise {
-        then(s,e): IPromise;
+        then(s?,e?,p?): IPromise;
     }
 
     function isPromise(v) {
@@ -20,6 +20,7 @@ module Ten {
         prom: IPromise;
         s: (val: any) => any;
         e: (val: any) => any;
+        p: (val: any) => void;
     };
     interface IPromiseCallbackReturn {
         errorOccur: bool;
@@ -87,13 +88,14 @@ module Ten {
             this.__callbacks = [];
         }
 
-        then(s,e): IPromise {
+        then(s?,e?,p?): IPromise {
             // create callback obj
             var prom = new BasePromise();
             prom.__parentPromise = this;
             var callbackObj: IPromiseCallback = {
                 s: s,
                 e: e,
+                p: p,
                 prom: prom,
             };
             if (this.__isUnfulfilled()) {
@@ -123,7 +125,7 @@ module Ten {
         }
         private __handleCallbacks(callbackObjs: IPromiseCallback[]) {
             var retVals: IPromiseCallbackReturn[] = [];
-            var cc = callbackObjs.reverse();
+            var cc = callbackObjs.reverse(); // reverse and COPY!
             while (cc.length > 0) {
                 var c = cc.pop();
                 var v = this.__callCallbackFunction(c);
@@ -154,6 +156,19 @@ module Ten {
                 retVal = err;
             }
             return { errorOccur: errOccur, value: retVal, prom: void 0 };
+        }
+
+        private __callProgressCallbacks(val) {
+            var cc = this.__callbacks.reverse(); // reverse and COPY!
+            while (cc.length > 0) {
+                var c = cc.pop();
+                var progressCallbackFunction = c.p;
+                if (progressCallbackFunction) {
+                    try {
+                        progressCallbackFunction(val);
+                    } catch (err) {} // catch and stop
+                }
+            }
         }
 
         private __isUnfulfilled() { // true when empty state or waiting state
@@ -197,10 +212,15 @@ module Ten {
             if (!this.__isUnfulfilled()) return;
             this.__setError(e);
         }
+
+        _progress(v) {
+            if (!this.__isUnfulfilled()) return;
+            this.__callProgressCallbacks(v);
+        }
     }
 
     interface IPromiseInit {
-        (s: (val) => void, e: (val) => void): void;
+        (s?: (val) => void, e?: (val) => void, p?: (val) => void): void;
     }
     export class Promise extends BasePromise {
         private __onCancel;
@@ -210,8 +230,9 @@ module Ten {
             var that = this;
             var s = function (v) { that._putValOrProm(v) };
             var e = function (v) { that._putError(v) };
+            var p = function (v) { that._progress(v) };
             try {
-                init(s,e);
+                init(s,e,p);
             } catch (err) {
                 e(err);
             }
