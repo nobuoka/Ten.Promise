@@ -1,7 +1,7 @@
 Ten.Promise
 ==============================
 
-CommonJS Promises/A+ implementation
+Promises/A+ implementation
 
 Requirements
 ------------------------------
@@ -13,7 +13,7 @@ To build Ten.Promise, following tools are needed:
 
 If you run tests, following commands are needed:
 
-* CommonJS Promises/A+ tests: [promises-aplus-tests](https://npmjs.org/package/promises-aplus-tests)
+* Promises/A+ tests: [promises-aplus-tests](https://npmjs.org/package/promises-aplus-tests)
 * Mocha: [mocha](http://visionmedia.github.com/mocha/)
 
 Build and Test
