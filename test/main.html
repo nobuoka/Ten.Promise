@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<link rel="canonical" href="http://ten-promise.vividcode.info/test/main.html">
+<title>Ten.Promise tests</title>
+<link rel="stylesheet" href="qunit.css">
+<script src="qunit.js"></script>
+<script>
+(function () {
+  var DEFAULT_TARGET_VERSION = "0.1.0";
+  var TEST_FILES_OF_VERSION = {};
+  TEST_FILES_OF_VERSION["0.1.0"] = ["../download/Ten.Promise-0.1.0.js", "tests-0.1.0.js"];
+
+  var targetVersion = DEFAULT_TARGET_VERSION;
+
+  var queryParamStr = location.search;
+  if (queryParamStr.substring(0,1) === "?") {
+      queryParamStr = queryParamStr.substring(1);
+  }
+  var queryParams = queryParamStr.split("&");
+  var kvPairs = [];
+  for (var i = 0, iLen = queryParams.length; i < iLen; ++i) {
+      var kvPair = queryParams[i].split("=", 2);
+      for (var j = 0, jLen = kvPair.length; j < jLen; ++j)
+          kvPair[j] = decodeURIComponent(kvPair[j]);
+      kvPairs.push(kvPair);
+
+      // target version
+      if (kvPair[0] === "v" && kvPair[1] in TEST_FILES_OF_VERSION) {
+          targetVersion = kvPair[1];
+      }
+  }
+
+  document.title += " (target version: " + targetVersion + ")";
+  var testFiles = TEST_FILES_OF_VERSION[targetVersion];
+  for (var i = 0, len = testFiles.length; i < len; ++i) {
+      var scriptElem = document.createElement("script");
+      scriptElem.src = testFiles[i];
+      document.getElementsByTagName("head")[0].appendChild(scriptElem);
+  }
+}).call(this);
+</script>
+</head>
+<body>
+<div id="qunit"></div>
+<div id="qunit-fixture"></div>
+</body>
+</html>
