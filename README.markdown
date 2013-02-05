@@ -5,6 +5,11 @@ Ten.Promise
 
 Promises/A+ implementation
 
+For library users
+------------------------------
+
+See: [Ten.Promise — Promises/A+ library](http://ten-promise.vividcode.info/)
+
 Requirements
 ------------------------------
 
