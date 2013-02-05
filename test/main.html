@@ -33,12 +33,28 @@
   }
 
   document.title += " (target version: " + targetVersion + ")";
-  var testFiles = TEST_FILES_OF_VERSION[targetVersion];
-  for (var i = 0, len = testFiles.length; i < len; ++i) {
+  var testFiles = TEST_FILES_OF_VERSION[targetVersion].slice(0);
+  function loadNextTestFile() {
+      var testFile = testFiles.shift();
+      if (!testFile) return;
       var scriptElem = document.createElement("script");
-      scriptElem.src = testFiles[i];
+      scriptElem.src = testFile;
+      function onload(evt) {
+          loadNextTestFile();
+      }
+      function onerror(evt) {
+          alert("loading test script failed");
+      }
+      scriptElem.onload = onload;
+      scriptElem.onerror = onerror;
+      scriptElem.onreadystatechange = function () {
+          if (this.readyState === "loaded" || this.readyState === "complete") {
+              onload();
+          }
+      };
       document.getElementsByTagName("head")[0].appendChild(scriptElem);
   }
+  loadNextTestFile();
 }).call(this);
 </script>
 </head>
