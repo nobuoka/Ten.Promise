@@ -60,7 +60,8 @@ module Ten {
                 }, false);
                 window.postMessage("triger of function call", "*");
             };
-        } else if (typeof setTimeout === "function") {
+        } else if (typeof setTimeout !== "undefined") {
+                // typeof setTimeout may be not "function" but "object"
             queueTaskToEventLoop = function (t: ITaskFunction) { setTimeout(t, 0) };
         } else {
             queueTaskToEventLoop = function (t: ITaskFunction) {
