@@ -42,7 +42,7 @@ module Ten {
             queueTaskToEventLoop = function (t: ITaskFunction) { process.nextTick(t) };
         } else if (typeof setImmediate === "function") {
             queueTaskToEventLoop = function (t: ITaskFunction) { setImmediate(t) };
-        } else if (typeof MessageChannel === "function") {
+        } else if (typeof MessageChannel !== "undefined") {
             queueTaskToEventLoop = function (t: ITaskFunction) {
                 var ch = new MessageChannel();
                 ch.port1.onmessage = function() {
@@ -60,8 +60,20 @@ module Ten {
                 }, false);
                 window.postMessage("triger of function call", "*");
             };
+        } else if (typeof window === "object" && typeof window.postMessage !== "undefined"
+                   && typeof window.attachEvent !== "undefined") {
+                   // Each `typeof setTimeout` and `typeof attachEvent` may be not "function" but "object"
+                   // in old IEs
+            queueTaskToEventLoop = function (t: ITaskFunction) {
+                var onMessage = function (evt) {
+                    window.detachEvent("onmessage", onMessage);
+                    t();
+                }
+                window.attachEvent("onmessage", onMessage);
+                window.postMessage("triger of function call", "*");
+            };
         } else if (typeof setTimeout !== "undefined") {
-                // typeof setTimeout may be not "function" but "object"
+                   // `typeof setTimeout` may be not "function" but "object" in old IEs
             queueTaskToEventLoop = function (t: ITaskFunction) { setTimeout(t, 0) };
         } else {
             queueTaskToEventLoop = function (t: ITaskFunction) {
