@@ -263,5 +263,11 @@ module Ten {
          * Determines whether a value fulfills the promise contract.
          */
         static is = isPromise;
+
+        static wrap(val) {
+            var p = new BasePromise();
+            p._putValue(val);
+            return p;
+        }
     }
 }
