@@ -1,7 +1,14 @@
+<a href="http://promises-aplus.github.com/promises-spec"><img src="http://promises-aplus.github.com/promises-spec/assets/logo-small.png" align="right" /></a>
+
 Ten.Promise
 ==============================
 
-CommonJS Promises/A+ implementation
+Promises/A+ implementation
+
+For library users
+------------------------------
+
+See: [Ten.Promise — Promises/A+ library](http://ten-promise.vividcode.info/)
 
 Requirements
 ------------------------------
@@ -13,7 +20,7 @@ To build Ten.Promise, following tools are needed:
 
 If you run tests, following commands are needed:
 
-* CommonJS Promises/A+ tests: [promises-aplus-tests](https://npmjs.org/package/promises-aplus-tests)
+* Promises/A+ tests: [promises-aplus-tests](https://npmjs.org/package/promises-aplus-tests)
 * Mocha: [mocha](http://visionmedia.github.com/mocha/)
 
 Build and Test
@@ -54,3 +61,8 @@ Here is list of environment variables which you can use.
 * TSC: command of TypeScript compiler (default value is `tsc`)
 * APLUS_TESTS: command of Promises/A+ tests (default value is `promises-apluts-tests`)
 * MOCHA: mocha command (default value is `mocha`)
+
+License
+------------------------------
+
+This software is published under The MIT License.
