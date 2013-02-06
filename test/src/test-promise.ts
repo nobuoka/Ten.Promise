@@ -704,4 +704,38 @@ t.testAsync("If promise is not unfulfilled, promise don't call progress callback
     }, dontCall);
 });
 
+t.testAsync("Static method `is` returns `true` if the value has `then` method", function (done) {
+    t.strictEqual(Promise.is(new Promise(function () {})), true,
+            "Unfulfilled `Promise` object is a promise object");
+    t.strictEqual(Promise.is(new Promise(function (s,e) { s(100) })), true,
+            "Fulfilled `Promise` object is a promise object");
+    t.strictEqual(Promise.is(new Promise(function (s,e) { e("test") })), true,
+            "Rejected `Promise` object is a promise object");
+    t.strictEqual(Promise.is({ then: function () { /* do nothing */ } }), true,
+            "Object with `then` method is a promise object");
+
+    t.strictEqual(Promise.is({}), false,
+            "Object without `then` property is not a promise object");
+    t.strictEqual(Promise.is({ then: null }), false,
+            "Object with `then` property whose value is `null` is not a promise object");
+    t.strictEqual(Promise.is({ then: {} }), false,
+            "Object with `then` property whose value is an object is not a promise object");
+    t.strictEqual(Promise.is({ then: void 0 }), false,
+            "Object with `then` property whose value is `undefined` is not a promise object");
+    t.strictEqual(Promise.is({ then: "not function" }), false,
+            "Object with `then` property whose value is string is not a promise object");
+    t.strictEqual(Promise.is("string"), false,
+            "String value is not a promise object");
+    t.strictEqual(Promise.is(100), false,
+            "Number value is not a promise object");
+    // This assertion fails with WinJS.Promise (`WinJS.Promise.is(null)` returns `null`)
+    t.strictEqual(Promise.is(null), false,
+            "Null value is not a promise object");
+    // This assertion fails with WinJS.Promise (`WinJS.Promise.is(void 0)` returns `undefined`)
+    t.strictEqual(Promise.is(void 0), false,
+            "Undefined value is not a promise object");
+
+    done();
+});
+
 }).call(this);

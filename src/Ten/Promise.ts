@@ -258,5 +258,10 @@ module Ten {
             }
             super.cancel();
         }
+
+        /**
+         * Determines whether a value fulfills the promise contract.
+         */
+        static is = isPromise;
     }
 }
