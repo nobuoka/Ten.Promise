@@ -275,5 +275,9 @@ module Ten {
             p._putError(reason);
             return p;
         }
+
+        static as(vop) {
+            return isPromise(vop) ? vop : Promise.wrap(vop);
+        }
     }
 }

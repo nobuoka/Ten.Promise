@@ -817,4 +817,37 @@ t.testAsync("Static method `wrapError` returns a rejected promise whose rejected
         done();
     });
 });
+
+t.testAsync("Static method `as` returns a promise fulfilled with specified value if it is not a promise, or itself otherwise", function (done) {
+    var pOrder = [];
+    Promise.as(100).then(function (val) {
+        t.strictEqual(val, 100);
+        pOrder.push(1);
+    });
+    Promise.as(null).then(function (val) {
+        t.strictEqual(val, null);
+        pOrder.push(2);
+    });
+    Promise.as(void 0).then(function (val) {
+        t.strictEqual(val, void 0);
+        pOrder.push(3);
+    });
+    var obj = { test: "good" };
+    Promise.as(obj).then(function (val) {
+        t.strictEqual(val, obj);
+        pOrder.push(4);
+    });
+
+    var pseudoPromObj = { then: function (s) { s(200) } };
+    t.strictEqual(Promise.as(pseudoPromObj), pseudoPromObj,
+        "If specified value is a promise-like object, `as` method returns itself");
+    var promObj = new Promise(function (s) { s(300) });
+    t.strictEqual(Promise.as(promObj), promObj,
+        "If specified value is a `Promise` object, `as` method returns itself");
+
+    Promise.wrap(0).then(function (val) {
+        t.deepEqual(pOrder, [1,2,3,4]);
+        done();
+    });
+});
 }).call(this);
