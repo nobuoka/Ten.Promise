@@ -969,4 +969,191 @@ t.testAsync("Cancellation of `waitAll`", function (done) {
         done();
     });
 });
+
+t.testAsync("Static method `join`", function (done) {
+    var pOrder = [];
+    var testsPromises = [];
+
+    // wait for nothing
+    (function () {
+        var vals1 = [];
+        var vals2 = {};
+        var testP1 = Promise.join(vals1).then(function (val) {
+            t.deepEqual(val, []);
+            pOrder.push(1);
+        });
+        var testP2 = Promise.join(vals2).then(function (val) {
+            t.deepEqual(val, {});
+            pOrder.push(2);
+        });
+        testsPromises.push(testP1);
+        testsPromises.push(testP2);
+    }).call(this);
+
+    // wait for only one fulfilled promise
+    (function () {
+        var p1 = Promise.wrap(100);
+        var vals = [p1];
+        var p = Promise.join(vals);
+        var testP = p.then(function (val) {
+            t.deepEqual(val, [100]);
+            pOrder.push(3);
+        });
+        testsPromises.push(testP);
+    }).call(this);
+
+    // wait for only one rejected promise
+    (function () {
+        var p1 = Promise.wrapError("error");
+        var vals = [p1];
+        var p = Promise.join(vals);
+        var testP = p.then(function () {
+            pOrder.push("NG");
+            t.ok(false, "not be here");
+        }, function onRejected(reason) {
+            // The promise returned `Promise.join(vals)` will be rejected in
+            // case there is at least one rejected promise on vals' property
+            t.deepEqual(Object.keys(reason), ["0"]);
+            t.deepEqual(reason[0], "error");
+            pOrder.push(4);
+        });
+        testsPromises.push(testP);
+    }).call(this);
+
+    // wait for unfulfilled promises (all success)
+    (function () {
+        var pOrder1 = [];
+
+        var f1;
+        var p1 = new Promise(function (f) { f1 = f });
+        p1.then(function (v) { pOrder1.push(1) });
+        var f2;
+        var p2 = new Promise(function (f) { f2 = f });
+        p2.then(function (v) { pOrder1.push(2) });
+        var f3;
+        var p3 = new Promise(function (f) { f3 = f });
+        p3.then(function (v) { pOrder1.push(3) });
+
+        var vals = [p1,p2,p3,"not promise",null];
+        var p = Promise.join(vals);
+        var testP = p.then(function (val) {
+            t.strictEqual(val[0], 100);
+            t.strictEqual(val[1], null);
+            t.strictEqual(val[2], "success");
+            t.deepEqual(pOrder1, [2,1,3]);
+            pOrder.push(5);
+        });
+        testsPromises.push(testP);
+
+        f2(null);
+        f1(100);
+        p2.then(function () {
+            f3("success");
+        });
+    }).call(this);
+
+    // wait for unfulfilled promises (some rejected)
+    (function () {
+        var pOrder1 = [];
+
+        var f1;
+        var p1 = new Promise(function (f) { f1 = f });
+        p1.then(function (v) { pOrder1.push(1) });
+        var r2;
+        var p2 = new Promise(function (f,r) { r2 = r });
+        p2.then(null, function onRejected(v) { pOrder1.push(2) });
+        var f3;
+        var p3 = new Promise(function (f) { f3 = f });
+        p3.then(function (v) { pOrder1.push(3) });
+        var r4;
+        var p4 = new Promise(function (f,r) { r4 = r });
+        p4.then(null, function onRejected(v) { pOrder1.push(4) });
+
+        var vals = [p1,p2,p3,p4,"not promise",null];
+        var p = Promise.join(vals);
+        var testP = p.then(function () {
+            pOrder.push("NG");
+            t.ok(false, "not be here");
+        }, function onRejected(val) {
+            t.deepEqual(Object.keys(val), ["1","3"],
+                "`val` has properties whose values are rejected promises");
+            t.strictEqual(val[1], "rejected reason");
+            t.strictEqual(val[3], null);
+            t.deepEqual(pOrder1, [2,1,3,4]);
+            pOrder.push(6);
+        });
+        testsPromises.push(testP);
+
+        r2("rejected reason");
+        f1(100);
+        p2.then(null, function onRejected() {
+            f3("success");
+        }).then(function () {
+            r4(null);
+        });
+    }).call(this);
+
+    Promise.waitAll(testsPromises).then(function () {
+        t.deepEqual(pOrder, [1,2,3,4,5,6]);
+        done();
+    });
+});
+
+t.testAsync("Cancellation of `join`", function (done) {
+    var pOrder = [];
+    var testsPromises = [];
+
+    // If there is no rejected promise, cancelled `Promise.join` is rejected
+    // with Canceled Error.
+    (function () {
+        var p1 = new Promise(function () {});
+        var waitP = Promise.join([p1]);
+        var waitP2 = waitP.then(null, function (reason) {
+            t.strictEqual(reason.name, "Canceled");
+            pOrder.push(1);
+        });
+        var p2 = p1.then(function () {
+            t.ok(false, "This promise is not canceled even when the promise waiting this promise is cancelled");
+            pOrder.push("not be here");
+        }, function onRejected(reason) {
+            t.strictEqual(reason.name, "Canceled");
+            pOrder.push(2);
+        });
+
+        waitP.cancel();
+        testsPromises.push(waitP2);
+    }).call(this);
+
+    // If there are at least one rejected promise, cancelled `Promise.join` is rejected
+    // with all rejected promises.
+    (function () {
+        var p1 = new Promise(function () {});
+        var r2;
+        var p2 = new Promise(function (f,r) { r2 = r });
+        var waitP = Promise.join([p1,p2]);
+        var waitP2 = waitP.then(null, function (reason) {
+            t.deepEqual(Object.keys(reason).sort(), ["0","1"]);
+            t.strictEqual(reason[0].name, "Canceled");
+            t.strictEqual(reason[1], "rejected2");
+            pOrder.push(3);
+        });
+        var p3 = p1.then(function () {
+            t.ok(false, "This promise is not canceled even when the promise waiting this promise is cancelled");
+            pOrder.push("not be here");
+        }, function onRejected(reason) {
+            t.strictEqual(reason.name, "Canceled");
+            pOrder.push(4);
+        });
+
+        r2("rejected2");
+        waitP.cancel();
+        testsPromises.push(waitP2);
+        testsPromises.push(p3);
+    }).call(this);
+
+    Promise.waitAll(testsPromises).then(function () {
+        t.deepEqual(pOrder, [1,2,3,4]);
+        done();
+    });
+});
 }).call(this);

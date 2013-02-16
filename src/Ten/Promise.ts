@@ -86,6 +86,10 @@ module Ten {
         }
     })();
 
+    export interface IBasePromiseConstructorOptions {
+        onCancel?: { (): void; };
+    }
+
     export class BasePromise implements IPromise {
         static _STAT_EMPTY  = 1;
         static _STAT_WAIT   = 2;
@@ -99,8 +103,11 @@ module Ten {
         private __val: any;
         private __callbackTypeName: string;
         private __parentPromise: BasePromise;
+        private __onCancel: { (): void; };
 
-        constructor() {
+        constructor(options?: IBasePromiseConstructorOptions) {
+            if (!options) options = {};
+            if (options.onCancel) this.__onCancel = options.onCancel;
             this.__stat = BasePromise._STAT_EMPTY;
             this.__callbacks = [];
         }
@@ -125,6 +132,12 @@ module Ten {
         }
 
         cancel() {
+            if (typeof this.__onCancel === "function") {
+                try {
+                    this.__onCancel();
+                } catch (err) {} // catch and stop here
+            }
+
             var cancelTargetProm;
             if (this.__stat === BasePromise._STAT_EMPTY) {
                 var cancelTargetProm = this.__parentPromise;
@@ -240,10 +253,8 @@ module Ten {
         (s: (val) => void, e: (val) => void, p: (val) => void): void;
     }
     export class Promise extends BasePromise {
-        private __onCancel;
         constructor(init: IPromiseInit, onCancel?: ITaskFunction) {
-            super();
-            this.__onCancel = onCancel;
+            super({ onCancel: onCancel });
             var that = this;
             var s = function (v) { that._putValOrProm(v) };
             var e = function (v) { that._putError(v) };
@@ -253,14 +264,6 @@ module Ten {
             } catch (err) {
                 e(err);
             }
-        }
-        cancel() {
-            if (typeof this.__onCancel === "function") {
-                try {
-                    this.__onCancel();
-                } catch (err) {} // catch and stop here
-            }
-            super.cancel();
         }
 
         /**
@@ -325,6 +328,51 @@ module Ten {
                     if (count === 0) complete(values);
                 }
             );
+        }
+
+        /**
+         * Creates a promise that is fulfilled when all the values are fulfilled.
+         */
+        static join(values) {
+            var numErrors = 0;
+            var numCanceled = 0;
+            var errors = {};
+            var fulfilleds = {};
+            var p = new BasePromise({
+                onCancel: function () {
+                    for (var name in values) {
+                        var v = values[name];
+                        if (isPromise(v) && typeof v.cancel === "function") v.cancel();
+                    }
+                }
+            });
+            Promise.waitAll(values).then(function (values) {
+                if (numErrors === 0) { // all success
+                    for (var name in fulfilleds) values[name] = fulfilleds[name];
+                    p._putValue(values);
+                } else if (numErrors - numCanceled === 0) {
+                    // no error (except canceled) and al least one canceled
+                    p._putError(createCancelError());
+                } else {
+                    // at least one error (except canceled)
+                    p._putError(errors);
+                }
+            }, function (err) {
+                var e = new Error("unexpected error: see `detail` property of this object");
+                e["detail"] = err;
+                p._putError(e);
+            }, function (dat) {
+                if (!dat.isError) {
+                    fulfilleds[dat.key] = dat.value;
+                } else {
+                    numErrors++;
+                    if (dat.error && isCancelError(dat.error)) numCanceled++;
+                    errors[dat.key] = dat.error;
+                }
+                // same interface with WinJS.Promise
+                p._progress({ Key: dat.key, Done: true });
+            });
+            return p;
         }
     }
 }
