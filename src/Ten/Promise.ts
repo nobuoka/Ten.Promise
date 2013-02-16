@@ -258,5 +258,26 @@ module Ten {
             }
             super.cancel();
         }
+
+        /**
+         * Determines whether a value fulfills the promise contract.
+         */
+        static is = isPromise;
+
+        static wrap(val) {
+            var p = new BasePromise();
+            p._putValue(val);
+            return p;
+        }
+
+        static wrapError(reason) {
+            var p = new BasePromise();
+            p._putError(reason);
+            return p;
+        }
+
+        static as(vop) {
+            return isPromise(vop) ? vop : Promise.wrap(vop);
+        }
     }
 }

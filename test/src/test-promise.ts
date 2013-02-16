@@ -704,4 +704,150 @@ t.testAsync("If promise is not unfulfilled, promise don't call progress callback
     }, dontCall);
 });
 
+t.testAsync("Static method `is` returns `true` if the value has `then` method", function (done) {
+    t.strictEqual(Promise.is(new Promise(function () {})), true,
+            "Unfulfilled `Promise` object is a promise object");
+    t.strictEqual(Promise.is(new Promise(function (s,e) { s(100) })), true,
+            "Fulfilled `Promise` object is a promise object");
+    t.strictEqual(Promise.is(new Promise(function (s,e) { e("test") })), true,
+            "Rejected `Promise` object is a promise object");
+    t.strictEqual(Promise.is({ then: function () { /* do nothing */ } }), true,
+            "Object with `then` method is a promise object");
+
+    t.strictEqual(Promise.is({}), false,
+            "Object without `then` property is not a promise object");
+    t.strictEqual(Promise.is({ then: null }), false,
+            "Object with `then` property whose value is `null` is not a promise object");
+    t.strictEqual(Promise.is({ then: {} }), false,
+            "Object with `then` property whose value is an object is not a promise object");
+    t.strictEqual(Promise.is({ then: void 0 }), false,
+            "Object with `then` property whose value is `undefined` is not a promise object");
+    t.strictEqual(Promise.is({ then: "not function" }), false,
+            "Object with `then` property whose value is string is not a promise object");
+    t.strictEqual(Promise.is("string"), false,
+            "String value is not a promise object");
+    t.strictEqual(Promise.is(100), false,
+            "Number value is not a promise object");
+    // This assertion fails with WinJS.Promise (`WinJS.Promise.is(null)` returns `null`)
+    t.strictEqual(Promise.is(null), false,
+            "Null value is not a promise object");
+    // This assertion fails with WinJS.Promise (`WinJS.Promise.is(void 0)` returns `undefined`)
+    t.strictEqual(Promise.is(void 0), false,
+            "Undefined value is not a promise object");
+
+    done();
+});
+
+t.testAsync("Static method `wrap` wraps a specified value as it is", function (done) {
+    var pOrder = [];
+    Promise.wrap(100).then(function (val) {
+        t.strictEqual(val, 100);
+        pOrder.push(1);
+    });
+    Promise.wrap(null).then(function (val) {
+        t.strictEqual(val, null);
+        pOrder.push(2);
+    });
+    Promise.wrap(void 0).then(function (val) {
+        t.strictEqual(val, void 0);
+        pOrder.push(3);
+    });
+    var obj = { test: "good" };
+    Promise.wrap(obj).then(function (val) {
+        t.strictEqual(val, obj);
+        pOrder.push(4);
+    });
+
+    // these two assertions fail with WinJS.Promise... I don't know which spec is good
+    var pseudoPromObj = { then: function (s) { s(200) } };
+    Promise.wrap(pseudoPromObj).then(function (val) {
+        t.strictEqual(val, pseudoPromObj,
+                "Although specified value is a promise-like object, the value is just wrapped");
+        pOrder.push(5);
+    });
+    var promObj = new Promise(function (s) { s(300) });
+    Promise.wrap(promObj).then(function (val) {
+        t.strictEqual(val, promObj,
+                "Although specified value is a `Promise` object, the value is just wrapped");
+        pOrder.push(6);
+    });
+
+    Promise.wrap(0).then(function (val) {
+        t.deepEqual(pOrder, [1,2,3,4,5,6]);
+        done();
+    });
+});
+
+t.testAsync("Static method `wrapError` returns a rejected promise whose rejected reason is specified value", function (done) {
+    var pOrder = [];
+    Promise.wrapError(100).then(null, function onError(val) {
+        t.strictEqual(val, 100);
+        pOrder.push(1);
+    });
+    Promise.wrapError(null).then(null, function onError(val) {
+        t.strictEqual(val, null);
+        pOrder.push(2);
+    });
+    Promise.wrapError(void 0).then(null, function onError(val) {
+        t.strictEqual(val, void 0);
+        pOrder.push(3);
+    });
+    var obj = { test: "good" };
+    Promise.wrapError(obj).then(null, function onError(val) {
+        t.strictEqual(val, obj);
+        pOrder.push(4);
+    });
+
+    // these two assertions fail with WinJS.Promise... I don't know which spec is good
+    var pseudoPromObj = { then: function (s) { s(200) } };
+    Promise.wrapError(pseudoPromObj).then(null, function onError(val) {
+        t.strictEqual(val, pseudoPromObj,
+                "Although specified value is a promise-like object, the value is just wrapped as rejected reason");
+        pOrder.push(5);
+    });
+    var promObj = new Promise(function (s) { s(300) });
+    Promise.wrapError(promObj).then(null, function onError(val) {
+        t.strictEqual(val, promObj,
+                "Although specified value is a `Promise` object, the value is just wrapped as rejected reason");
+        pOrder.push(6);
+    });
+
+    Promise.wrap(0).then(function (val) {
+        t.deepEqual(pOrder, [1,2,3,4,5,6]);
+        done();
+    });
+});
+
+t.testAsync("Static method `as` returns a promise fulfilled with specified value if it is not a promise, or itself otherwise", function (done) {
+    var pOrder = [];
+    Promise.as(100).then(function (val) {
+        t.strictEqual(val, 100);
+        pOrder.push(1);
+    });
+    Promise.as(null).then(function (val) {
+        t.strictEqual(val, null);
+        pOrder.push(2);
+    });
+    Promise.as(void 0).then(function (val) {
+        t.strictEqual(val, void 0);
+        pOrder.push(3);
+    });
+    var obj = { test: "good" };
+    Promise.as(obj).then(function (val) {
+        t.strictEqual(val, obj);
+        pOrder.push(4);
+    });
+
+    var pseudoPromObj = { then: function (s) { s(200) } };
+    t.strictEqual(Promise.as(pseudoPromObj), pseudoPromObj,
+        "If specified value is a promise-like object, `as` method returns itself");
+    var promObj = new Promise(function (s) { s(300) });
+    t.strictEqual(Promise.as(promObj), promObj,
+        "If specified value is a `Promise` object, `as` method returns itself");
+
+    Promise.wrap(0).then(function (val) {
+        t.deepEqual(pOrder, [1,2,3,4]);
+        done();
+    });
+});
 }).call(this);
