@@ -777,4 +777,44 @@ t.testAsync("Static method `wrap` wraps a specified value as it is", function (d
         done();
     });
 });
+
+t.testAsync("Static method `wrapError` returns a rejected promise whose rejected reason is specified value", function (done) {
+    var pOrder = [];
+    Promise.wrapError(100).then(null, function onError(val) {
+        t.strictEqual(val, 100);
+        pOrder.push(1);
+    });
+    Promise.wrapError(null).then(null, function onError(val) {
+        t.strictEqual(val, null);
+        pOrder.push(2);
+    });
+    Promise.wrapError(void 0).then(null, function onError(val) {
+        t.strictEqual(val, void 0);
+        pOrder.push(3);
+    });
+    var obj = { test: "good" };
+    Promise.wrapError(obj).then(null, function onError(val) {
+        t.strictEqual(val, obj);
+        pOrder.push(4);
+    });
+
+    // these two assertions fail with WinJS.Promise... I don't know which spec is good
+    var pseudoPromObj = { then: function (s) { s(200) } };
+    Promise.wrapError(pseudoPromObj).then(null, function onError(val) {
+        t.strictEqual(val, pseudoPromObj,
+                "Although specified value is a promise-like object, the value is just wrapped as rejected reason");
+        pOrder.push(5);
+    });
+    var promObj = new Promise(function (s) { s(300) });
+    Promise.wrapError(promObj).then(null, function onError(val) {
+        t.strictEqual(val, promObj,
+                "Although specified value is a `Promise` object, the value is just wrapped as rejected reason");
+        pOrder.push(6);
+    });
+
+    Promise.wrap(0).then(function (val) {
+        t.deepEqual(pOrder, [1,2,3,4,5,6]);
+        done();
+    });
+});
 }).call(this);

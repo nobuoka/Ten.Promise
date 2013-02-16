@@ -269,5 +269,11 @@ module Ten {
             p._putValue(val);
             return p;
         }
+
+        static wrapError(reason) {
+            var p = new BasePromise();
+            p._putError(reason);
+            return p;
+        }
     }
 }
