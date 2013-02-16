@@ -850,4 +850,123 @@ t.testAsync("Static method `as` returns a promise fulfilled with specified value
         done();
     });
 });
+
+t.testAsync("Static method `waitAll` waits for each of specified promises to be fulfilled/rejected", function (done) {
+    var pOrder = [];
+    var testsPromises = [];
+
+    // wait for nothing
+    (function () {
+        var vals = [];
+        var p = Promise.waitAll(vals);
+        var testP = p.then(function (val) {
+            t.strictEqual(val, vals,
+                "a promise returned by `Promise.waitAll(vals)` is fulfilled with `vals`");
+            t.deepEqual(vals, [], "contents of `vals` are not changed");
+            pOrder.push(1);
+        });
+        testsPromises.push(testP);
+    }).call(this);
+
+    // wait for only one fulfilled promise
+    (function () {
+        var p1 = Promise.wrap(100);
+        var vals = [p1];
+        var p = Promise.waitAll(vals);
+        var testP = p.then(function (val) {
+            t.strictEqual(val, vals,
+                "a promise returned by `Promise.waitAll(vals)` is fulfilled with `vals`");
+            t.deepEqual(vals, [p1], "contents of `vals` are not changed");
+            pOrder.push(2);
+        });
+        testsPromises.push(testP);
+    }).call(this);
+
+    // wait for only one rejected promise
+    (function () {
+        var p1 = Promise.wrapError("error");
+        var vals = [p1];
+        var p = Promise.waitAll(vals);
+        var testP = p.then(function (val) {
+            t.strictEqual(val, vals,
+                "a promise returned by `Promise.waitAll(vals)` is fulfilled with `vals`");
+            t.deepEqual(vals, [p1], "contents of `vals` are not changed");
+            pOrder.push(3);
+        });
+        testsPromises.push(testP);
+    }).call(this);
+
+    // wait for unfulfilled promises
+    (function () {
+        var pOrder1 = [];
+
+        var f1;
+        var p1 = new Promise(function (f) { f1 = f });
+        p1.then(function (v) { pOrder1.push(1) });
+        var r2;
+        var p2 = new Promise(function (f,r) { r2 = r });
+        p2.then(null, function onRejected(v) { pOrder1.push(2) });
+        var f3;
+        var p3 = new Promise(function (f) { f3 = f });
+        p3.then(function (v) { pOrder1.push(3) });
+        var r4;
+        var p4 = new Promise(function (f,r) { r4 = r });
+        p4.then(null, function onRejected(v) { pOrder1.push(4) });
+
+        var vals = [p1,p2,p3,p4,"not promise",null];
+        var p = Promise.waitAll(vals);
+        var testP = p.then(function (val) {
+            t.strictEqual(val, vals,
+                "a promise returned by `Promise.waitAll(vals)` is fulfilled with `vals`");
+            t.deepEqual(vals, [p1,p2,p3,p4,"not promise",null],
+                "contents of `vals` are not changed");
+            t.deepEqual(pOrder1, [1,2,3,4]);
+            pOrder.push(4);
+        });
+        testsPromises.push(testP);
+
+        f1("ok");
+        r2("ok");
+        p2.then(null, function onRejected() {
+            f3("ok");
+        }).then(function () {
+            r4("ok");
+        });
+    }).call(this);
+
+    Promise.waitAll(testsPromises).then(function () {
+        t.deepEqual(pOrder, [1,2,3,4]);
+        done();
+    });
+});
+
+t.testAsync("Cancellation of `waitAll`", function (done) {
+    var pOrder = [];
+
+    var f1;
+    var p1 = new Promise(function (f) { f1 = f });
+    var waitP = Promise.waitAll([p1]);
+    var waitP2 = waitP.then(null, function (reason) {
+        t.strictEqual(reason.name, "Canceled");
+        pOrder.push(1);
+    });
+    var p2 = p1.then(function () {
+        pOrder.push(2);
+    }, function onRejected(reason) {
+        t.ok(false, "This promise is not canceled even when the promise waiting this promise is cancelled");
+        pOrder.push("not be here");
+    });
+
+    waitP.cancel();
+    waitP2.then(function () {
+        f1("do");
+    });
+
+    var testsPromises = [waitP, p2];
+
+    Promise.waitAll(testsPromises).then(function () {
+        t.deepEqual(pOrder, [1,2]);
+        done();
+    });
+});
 }).call(this);

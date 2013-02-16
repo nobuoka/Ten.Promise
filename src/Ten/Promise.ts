@@ -10,6 +10,10 @@ module Ten {
         return !!(v && typeof v.then === "function");
     }
 
+    function isCancelError(err) {
+        return !!(err && err.name === "Canceled");
+    }
+
     function createCancelError() {
         var err = new Error("Canceled");
         err.name = "Canceled";
@@ -233,7 +237,7 @@ module Ten {
     }
 
     interface IPromiseInit {
-        (s?: (val) => void, e?: (val) => void, p?: (val) => void): void;
+        (s: (val) => void, e: (val) => void, p: (val) => void): void;
     }
     export class Promise extends BasePromise {
         private __onCancel;
@@ -278,6 +282,49 @@ module Ten {
 
         static as(vop) {
             return isPromise(vop) ? vop : Promise.wrap(vop);
+        }
+
+        /**
+         * Wait for all promises which are properties of specified object/array
+         *
+         * Even if you cancel the returned promise, promises which are properties
+         * of specified object/array are not canceled.
+         * @param {Object|Array} values
+         * @return {Ten.Promise}
+         */
+        static waitAll(values) {
+            return new Promise(
+                function (complete, error, progress) {
+                    var count = 0;
+                    function onCompleted(name, val, isError) {
+                        count--;
+                        var obj = {
+                            done: true,
+                            key: name,
+                            isError: isError,
+                            error: void 0,
+                            value: void 0,
+                        };
+                        isError ? obj.error = val : obj.value = val;
+                        progress(obj);
+                        if (count === 0) complete(values);
+                    }
+                    for (var name in values) {
+                        var val = values[name];
+                        if (isPromise(val)) {
+                            count++;
+                            (function (name, promise) {
+                                promise.then(function (val) {
+                                    onCompleted(name, val, false);
+                                }, function onError(err) {
+                                    onCompleted(name, err, true);
+                                });
+                            })(name, val);
+                        }
+                    }
+                    if (count === 0) complete(values);
+                }
+            );
         }
     }
 }
