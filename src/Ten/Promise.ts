@@ -288,6 +288,48 @@ module Ten {
         }
 
         /**
+         * @param {Object|Array} values
+         * @return {Ten.Promise}
+         */
+        static any(values) {
+            var isArray = (Object.prototype.toString.call(values) === "[object Array]");
+            var keys = [];
+            if (isArray) {
+                for (var i = 0, len = values.length; i < len; ++i) keys.push("" + i);
+            } else {
+                for (var k in values) keys.push(k);
+            }
+            var asPromises = [];
+            return new Promise(function (fulfill, reject, progress) {
+                var errors = {};
+                if (keys.length === 0) {
+                    fulfill(void 0);
+                }
+                var numCanceled = 0;
+                for (var i = 0, len = keys.length; i < len; ++i) (function (key) {
+                    var p = Promise.as(values[key]);
+                    asPromises.push(p);
+                    p.then(
+                        function () { fulfill({ key: key, value: values[key] }); },
+                        function (e) {
+                            if (isCancelError(e)) {
+                                if ((++numCanceled) === keys.length)
+                                    reject(createCancelError());
+                            } else {
+                                reject({ key: key, value: values[key] });
+                            }
+                        }
+                    );
+                }).call(this, keys[i]);
+            }, function () {
+                for (var i = 0, len = asPromises.length; i < len; ++i) {
+                    var promise = asPromises[i];
+                    if (typeof promise.cancel === "function") promise.cancel();
+                }
+            });
+        }
+
+        /**
          * Wait for all promises which are properties of specified object/array
          *
          * Even if you cancel the returned promise, promises which are properties

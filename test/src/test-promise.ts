@@ -851,6 +851,107 @@ t.testAsync("Static method `as` returns a promise fulfilled with specified value
     });
 });
 
+t.testAsync("Static method `any`", function (done) {
+    var pOrder = [];
+
+    Promise.wrap(null).
+
+    // wait for not promise values
+    then(function () {
+        return Promise.any([1,2]).then(function (val) {
+            t.deepEqual(val, { key: "0", value: 1 });
+            pOrder.push(1);
+        });
+    }).
+
+    // wait for fulfilled promise
+    then(function () {
+        var p1 = Promise.wrap("fulfilled");
+        return Promise.any([p1]).then(function (val) {
+            t.deepEqual(val, { key: "0", value: p1 });
+            pOrder.push(2);
+        });
+    }).
+
+    // wait for rejected promise
+    then(function () {
+        var p1 = Promise.wrapError("rejected1");
+        return Promise.any([p1]).then(null, function (val) {
+            t.deepEqual(val, { key: "0", value: p1 });
+            pOrder.push(3);
+        });
+    }).
+
+    // wait for unfulfilled promise
+    then(function () {
+        var f1;
+        var p1 = new Promise(function (f) { f1 = f });
+        var f2;
+        var p2 = new Promise(function (f) { f2 = f });
+        var p = Promise.any([p1,p2]).then(function (val) {
+            t.deepEqual(val, { key: "1", value: p2 });
+            pOrder.push(5);
+        });
+        Promise.wrap(null).then(function () {
+            pOrder.push(4);
+            f2("ok");
+        });
+        return p;
+    }).
+
+    then(function () {
+        t.deepEqual(pOrder, [1,2,3,4,5]);
+        done();
+    }, function onRejected(err) {
+        t.ok(false, err);
+        done();
+    });
+});
+
+t.testAsync("Cancellation of `any`", function (done) {
+    var pOrder = [];
+    var testsPromises = [];
+
+    Promise.wrap(null).
+
+    // wait for unfulfilled promise
+    then(function () {
+        var p1 = new Promise(function (f) {}, function onCanceled() { pOrder.push(2) });
+        var p2 = new Promise(function (f) {}, function onCanceled() { pOrder.push(3) });
+        var p = Promise.any([p1,p2]).then(null, function onRejected(reason) {
+            t.strictEqual(reason.name, "Canceled");
+            pOrder.push(4);
+        });
+        Promise.wrap(null).then(function () {
+            pOrder.push(1);
+            p.cancel();
+        });
+        return p;
+    }).
+
+    // wait for unfulfilled promise
+    then(function () {
+        var p1 = new Promise(function (f) {}, function onCanceled() { pOrder.push(6) });
+        var p2 = new Promise(function (f) {}, function onCanceled() { pOrder.push(7) });
+        var p = Promise.any([p1,p2,200,null]).then(null, function onRejected(reason) {
+            t.strictEqual(reason.name, "Canceled");
+            pOrder.push(8);
+        });
+        pOrder.push(5);
+        p.cancel();
+        return p;
+    }).
+
+    then(function () {
+        t.deepEqual(pOrder, [1,2,3,4,5,6,7,8]);
+        done();
+    }, function onRejected(err) {
+        t.ok(false, err);
+        done();
+    });
+});
+
+
 t.testAsync("Static method `waitAll` waits for each of specified promises to be fulfilled/rejected", function (done) {
     var pOrder = [];
     var testsPromises = [];
